@@ -22,10 +22,10 @@ function write_results( NumSubOrbit::Int64, fname_out::Array{String}, fname_cont
   MatrixValuedOutPut= Array{Array{Complex128,2}}(Egrid)
   for w=1:Egrid
         MatrixValuedOutPut[w] = Aw_RealPart[w] -pi*(Aw[w])im 
-        if inversion_method
-            MatrixValuedOutPut[w] *= trace(eye(MatrixValuedOutPut[w]))
-            MatrixValuedOutPut[w] =  (    z*eye(MatrixValuedOutPut[w])-inv(MatrixValuedOutPut[w])    )
-        end
+#        if inversion_method
+#            MatrixValuedOutPut[w] *= trace(eye(MatrixValuedOutPut[w]))
+#            MatrixValuedOutPut[w] =  (    z*eye(MatrixValuedOutPut[w])-inv(MatrixValuedOutPut[w])    )
+#        end
         MatrixValuedOutPut[w] *=  Normalization;
         MatrixValuedOutPut[w] += GreenConst;
   end

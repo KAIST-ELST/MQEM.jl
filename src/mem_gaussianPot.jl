@@ -1,6 +1,6 @@
-using NLsolve
 
 #include("mem_variable.jl")
+#include("mem_ftn_def.jl")
 
 
 

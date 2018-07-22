@@ -39,8 +39,8 @@ end
 #Pulay Mixing
 #module pulay_DIIS_mixing
 function pulayMixing!(iter::Int64, mixing::Float64,
-         FtnIn::Array{Array{Complex128,2}},  FtnResid::Array{Array{Complex128,2}},
-        MixInfo::pulayInfo)
+         FtnIn::Array{Array{Complex128,2}},  FtnResid::Array{Array{Complex128,2}}, weight,
+         MixInfo::pulayInfo)
     
     if iter<MixInfo.mixingStart #Simple Mixing
         FtnMixed = FtnIn      + mixing*FtnResid
@@ -59,7 +59,7 @@ function pulayMixing!(iter::Int64, mixing::Float64,
         MixInfo.PulayMatrix[:, 3:removeComp+1] = MixInfo.PulayMatrix[:, 2:removeComp-1+1]
         MixInfo.PulayMatrix[3:removeComp+1, :] = MixInfo.PulayMatrix[2:removeComp-1+1, :]
         for i=1:min(iter-MixInfo.mixingStart+1, MixInfo.mixingMemory)
-            MixInfo.PulayMatrix[2,i+1] = real( matrixFtn_innerProduct( MixInfo.residHistory[1] , MixInfo.residHistory[i], dERealAxis  ))
+            MixInfo.PulayMatrix[2,i+1] = real( matrixFtn_innerProduct( MixInfo.residHistory[1] , MixInfo.residHistory[i],   weight ))
             MixInfo.PulayMatrix[i+1,2] = MixInfo.PulayMatrix[2,i+1]
         end
 
@@ -69,8 +69,8 @@ function pulayMixing!(iter::Int64, mixing::Float64,
 
         #To obtain best guessing  Aw
         if (iter%abs(MixInfo.mixingStep)==0) &&  MixInfo.mixingMemory>1  &&
-           iter >= MixInfo.mixingStart + MixInfo.mixingMemory 
-#           && det(Symmetric(temp)) != 0 
+           iter >= MixInfo.mixingStart + MixInfo.mixingMemory  &&
+            det(Symmetric(temp)) != 0 
 
             #Pulay interpol
             #Linear Solver
@@ -87,7 +87,7 @@ function pulayMixing!(iter::Int64, mixing::Float64,
             end
             if(MixInfo.mixingStep <0) 
                   FtnMixed = (1-mixing) * MixInfo.inputHistory[1] + mixing*(  FtnOpt + mixing * FtnOptResd  )
-            else  FtnMixed =                                                        FtnOpt + mixing * FtnOptResd 
+            else  FtnMixed =                                                  FtnOpt + mixing * FtnOptResd 
             end
             MixInfo.previousMixing = "pulay"
         else
