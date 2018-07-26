@@ -66,6 +66,7 @@ end
    start_cluster   
    N_Matsubara2    
    inverse_temp    
+   Asymtotic_HighFreq
  end
 
  struct real_freq_grid_info_

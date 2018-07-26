@@ -88,6 +88,7 @@ num_of_subblock =  input_ftn("num_of_subblock", 1)
 start_cluster    = input_ftn("start_cluster",0)
 N_Matsubara2     = input_ftn("N_Matsubara")
 inverse_temp    = input_ftn("inverse_temp")
+Asymtotic_HighFreq  = input_ftn("Asymtotic_HighFreq", true)
 
 
 
@@ -97,7 +98,8 @@ data_info = data_info_(workDirect,
 		       num_of_subblock,
 		       start_cluster,
 		       N_Matsubara2,
-		       inverse_temp)
+		       inverse_temp,
+		       Asymtotic_HighFreq)
 
 EwinOuterRight  = input_ftn("EwinOuterRight", 10.0)
 EwinOuterLeft   = input_ftn("EwinOuterLeft" ,-10.0)

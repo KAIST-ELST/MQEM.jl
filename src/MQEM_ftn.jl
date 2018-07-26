@@ -8,6 +8,12 @@
 #include("mem_variable.jl")
 #include("mem_gaussianPot.jl")
 
+
+
+
+
+
+
   function get_total_energy(imagFreqFtn ,Aw::Array{Array{Complex128,2}}, kernel, numeric)
           NumSubOrbit        = size(Aw[1])[1]
           Energy=0
@@ -22,7 +28,7 @@
           end
           moments =  kernel.moment * Aw
           temp = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3, imagFreqFtn.moments4, imagFreqFtn.moments5 ] - moments
-          Energy_tail =  (real(trace(copy(temp') * kernel.gamma * temp)))
+          Energy_tail =  real(trace(copy(temp') * kernel.gamma * temp))
           Energy  += Energy_tail
   
           return Energy
@@ -584,7 +590,7 @@
   
   
   #set N_Matsubara for low freq. 
-  if N_Matsubara > 500
+  if N_Matsubara > 500  &&  data_info.Asymtotic_HighFreq
     temp=[]
     for w = 1:N_Matsubara
         z = ((2.*w-1)*pi/inverse_temp)im;
