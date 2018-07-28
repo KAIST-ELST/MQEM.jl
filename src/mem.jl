@@ -249,7 +249,6 @@ for cluster=start_cluster:num_of_subblock-1
     GreenConstFull =  zeros(Complex128, NumFullOrbit,NumFullOrbit)
     (imagFreqFtn) = read_matsubara_GreenFtn!( data_info,  numeric, startOrbit, phyParm.NumSubOrbit)
     kernel = construct_Kernel_inCubicSpline(numeric, data_info)
-    #kernel = construct_Kernel_linear!( numeric)
     sigmaFlat = (EwinInnerRight - EwinInnerLeft)
     
     sigma = min(( trace(imagFreqFtn.moments3)-trace(imagFreqFtn.moments2)^2),  ((EwinOuterRight - EwinOuterLeft)/4)^2)
@@ -261,7 +260,7 @@ for cluster=start_cluster:num_of_subblock-1
     
     
     if(default_model=="f") #flat default_model
-      realFreqFtn.Spectral_default_model = construct_model_spectrum(imagFreqFtn.moments1, numeric, phyParm.NumSubOrbit, trace(imagFreqFtn.moments2), sigmaFlat,"G")
+      realFreqFtn.Spectral_default_model = construct_model_spectrum(imagFreqFtn.moments1, numeric, phyParm.NumSubOrbit, trace(imagFreqFtn.moments2), sigmaFlat,"F")
     elseif(default_model=="g")  #gaussian default_model
       Ainit= Hermitian(-1.0/(2*sigma^2) *eye(imagFreqFtn.moments2))
       Binit= Hermitian(-( trace(imagFreqFtn.moments2) / sigma^2)*eye(imagFreqFtn.moments2))
@@ -323,8 +322,9 @@ for cluster=start_cluster:num_of_subblock-1
       (logEnergy, logAlpha) = mem_annealing( kernel,  realFreqFtn, imagFreqFtn,numeric,   mem_fit_parm, mixing_parm, false, fname_out, data_info, startOrbit)
    end
    energy_optimal = get_total_energy( imagFreqFtn, realFreqFtn.Aw, kernel,numeric);
+   energy_tail_optimal = get_total_energy_for_tail( imagFreqFtn, realFreqFtn.Aw, kernel,numeric);
    println("optimal alpha: $(alpha_optimal),  log: $(log(alpha_optimal))")
-   println("Total energy at optimal alpha: $(energy_optimal)\n")
+   println("Total_energy_at_optimal_alpha: $(energy_optimal) tail_contribution: $(energy_tail_optimal) with_grid $(numeric.Egrid) \n")
  #  =#
  toc()
     

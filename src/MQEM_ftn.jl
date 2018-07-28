@@ -13,6 +13,20 @@
 
 
 
+  function get_total_energy_for_tail(imagFreqFtn ,Aw::Array{Array{Complex128,2}}, kernel, numeric)
+          NumSubOrbit        = size(Aw[1])[1]
+          moments =  kernel.moment * Aw
+          temp = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3] - moments
+	  Energy_tail=0;
+	  for mom = 1:3
+		  Energy_tail +=  kernel.gamma[mom,mom]* vecnorm( temp[mom])^2
+	  end
+	  Energy_tail +=  2*kernel.gamma[1,3]* real(trace(temp[1]'*temp[3]))
+  
+	  return real(Energy_tail)
+  end
+
+
 
   function get_total_energy(imagFreqFtn ,Aw::Array{Array{Complex128,2}}, kernel, numeric)
           NumSubOrbit        = size(Aw[1])[1]
@@ -27,11 +41,19 @@
              Energy    +=    (vecnorm(EnergyMatrix)^2)
           end
           moments =  kernel.moment * Aw
-          temp = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3, imagFreqFtn.moments4, imagFreqFtn.moments5 ] - moments
-          Energy_tail =  real(trace(copy(temp') * kernel.gamma * temp))
+
+
+          temp = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3 ] - moments
+	  Energy_tail=0;
+	  for mom = 1:3
+		  Energy_tail +=  kernel.gamma[mom,mom]* vecnorm( temp[mom])^2
+           end
+	  Energy_tail +=  2*kernel.gamma[1,3]* real(trace(temp[1]'*temp[3]))
+
+#          Energy_tail =  real(trace(copy(temp') * kernel.gamma * temp))
           Energy  += Energy_tail
   
-          return Energy
+	  return real(Energy)
   end
   
   
@@ -41,11 +63,11 @@
   function matrixFtn_norm( Aw::Array{Array{Complex128,2}} , weight::Array{Float64})
               # 1-norm, \int dw abs(A) = sum(abs(A))
               lengthOfVector = length(Aw)
-              normVector_temp = Array{Float64}(lengthOfVector)
+              normVector_temp = 0.0
               for w=1:lengthOfVector
-                    normVector_temp[w] =  (norm(Aw[w]))^2 *weight[w]
+                    normVector_temp  +=  (norm(Aw[w]))^2 *weight[w]
               end
-              return sqrt( sum(normVector_temp))
+	      return sqrt( normVector_temp )
   end
   
   
@@ -59,6 +81,8 @@
            Spectral_default_model[w] = Hermitian( (Green_Inf *( exp(-0.5 *((E-center)/eta)^2) + (1e-30)    ) ) )
          elseif(shape == "L")
            Spectral_default_model[w] = (Green_Inf * 1/( (E-center)^2 + eta^2) +1e-30*(eye(Green_Inf)) )
+         elseif(shape == "F")
+		 Spectral_default_model[w] = 1/(numeric.ERealAxis[numeric.Egrid]-numeric.ERealAxis[1]) * eye(Green_Inf) 
          end
      end
      model_norm = trace(sum(Spectral_default_model))
@@ -79,7 +103,7 @@
   function Hamiltonian_zeroSet( imagFreqFtn, kernel,
                                 Egrid::Int64,Spectral_default_model::Array{Array{Complex128,2}}, auxiliary_inverse_temp::Float64)
                                      
-	  Gmoment = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3, imagFreqFtn.moments4, imagFreqFtn.moments5 ]
+	  Gmoment = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3 ]
 	  Hamiltonian_out  = -auxiliary_inverse_temp * ( (kernel.Kernel_dagger)*(imagFreqFtn.GreenFtn) ) ;    
  	  Hamiltonian_out += -auxiliary_inverse_temp * ( (kernel.moment_dagger)*(kernel.gamma*Gmoment) ) ;    
 
@@ -216,7 +240,7 @@
               resdAw = Aw_in - Aw_out
               criteria_Aw =  matrixFtn_norm(resdAw, numeric.dERealAxis) ;
   
-                if(  criteria_Aw < 1e-11*NumSubOrbit     )
+                if(  criteria_Aw < 1e-12*NumSubOrbit     )
 	          E_in = get_total_energy(imagFreqFtn, Aw_in, kernel, numeric)
 	          E_out = get_total_energy(imagFreqFtn, Aw_out, kernel, numeric)
 		  if( abs(E_in-E_out) < 1e-8 )
@@ -328,7 +352,7 @@
                   end
                   for iw=numeric.N_Matsubara+1:numeric.N_MatsubaraDATA
                       z = ((2.*iw-1)*pi/data_info.inverse_temp)im;
-		      ftn =   moments_rep[1]/z +  moments_rep[2]/ z^2 + moments_rep[3] /z^3+ moments_rep[4] /z^4
+		      ftn =   moments_rep[1]/z +  moments_rep[2]/ z^2 + moments_rep[3] /z^3
 		      ftn += imagFreqFtn.GreenConst
 		      ftn = ftn[i,j]
                       write(f,"$(imag(z))  $(real(ftn))    $(imag(ftn))  \n" )
@@ -440,7 +464,7 @@
   end
   
   Egrid = length(ERealAxis)
-  println("Egrid: ",Egrid)   #Egrid = num of energy point including endpoint , not space number
+  println("Egrid_in_nonuniform_grid: ",Egrid)   #Egrid = num of energy point including endpoint , not space number
   
   push!(dERealAxis, (ERealAxis[2] - ERealAxis[1])/2 )
   for i=2:Egrid-1;
@@ -714,11 +738,11 @@
      kernel = strKernel(
       zeros(Complex128, N_Matsubara,   numeric.Egrid)
      ,zeros(Complex128, numeric.Egrid, N_Matsubara)
-     ,zeros(Float64, 5, numeric.Egrid)
-     ,zeros(Float64, numeric.Egrid, 5)
+     ,zeros(Float64, 3, numeric.Egrid)
+     ,zeros(Float64, numeric.Egrid, 3)
      ,zeros(Complex128, numeric.Egrid, numeric.Egrid)
      ,zeros(Complex128, 4*(numeric.Egrid-1),numeric.Egrid)
-     ,zeros(Complex128, 5,5)
+     ,zeros(Complex128, 3,3)
      )
   
   
@@ -738,10 +762,10 @@
        T[4*(j-1)+1, j  ] =1.0 
        T[4*(j-1)+2, j+1] =1.0 
   
-       T[4*(j-1)+3, j  ] =0.0
-       T[4*(j-1)+4, j  ] =0.0
-       T[4*(j-1)+3, j+1] =0.0
-       T[4*(j-1)+4, j+1] =0.0
+#       T[4*(j-1)+3, j  ] =0.0
+#       T[4*(j-1)+4, j  ] =0.0
+#       T[4*(j-1)+3, j+1] =0.0
+#       T[4*(j-1)+4, j+1] =0.0
      end
   
   
@@ -786,7 +810,9 @@
   
   
      #boundary conditions:
-     B[s+3, 2] = 2    #S''(w1) = 0
+
+     #S''(w1) = 0
+     B[s+3, 2] = 2    
      #S''(w_N) = 0
      B[s+4, s+1] = 6*dSegment[j]
      B[s+4, s+2] = 2
@@ -794,11 +820,11 @@
   
   
   
-     #integration of the cubic polynomials  \int (1/(iwn - w) *  (w-wj)^3 +  (w-wj)^2 +  (w-wj) + 1 ) = f1+f2+f3+f4
-     f1(iwn, wj, w ) =  -(iwn-wj)^2 * w - (iwn-wj)*w^2/2 -w^3/3 -(iwn-wj)^3 * log(-iwn + wj +w)
-     f2(iwn, wj, w ) =  -(iwn-wj)*w - w^2 /2                    -(iwn-wj)^2 * log(-iwn + wj +w)
-     f3(iwn, wj, w ) =  -w                                      -(iwn-wj)   * log(-iwn + wj +w)
-     f4(iwn, wj, w ) =                                          -             log(-iwn + wj +w)
+     #integration of the cubic polynomials  F = \int (1/(iwn - w) *  (w-wj)^3 +  (w-wj)^2 +  (w-wj) + 1 ) = (f1+f2+f3+f4)(iwn, wj, wj+dw)
+     f1(iwn, wj, dw ) =  -(iwn-wj)^2 * dw - (iwn-wj)*dw^2/2 -dw^3/3 -(iwn-wj)^3 * log(-iwn + wj +dw)
+     f2(iwn, wj, dw ) =  -(iwn-wj)*dw -dw^2 /2                    -(iwn-wj)^2 * log(-iwn + wj +dw)
+     f3(iwn, wj, dw ) =  -dw                                      -(iwn-wj)   * log(-iwn + wj +dw)
+     f4(iwn, wj, dw ) =                                          -             log(-iwn + wj +dw)
   
      for n=1:N_Matsubara
       iwn = ((2.*n-1)*pi/data_info.inverse_temp)im;
@@ -821,12 +847,23 @@
      Gamma4 = 0.0
      Gamma5 = 0.0
      
-     for iw = N_Matsubara:1e4*N_Matsubara
+     Gamma1 =  (data_info.inverse_temp^2)*1/8
+     Gamma2 =  (data_info.inverse_temp^4)*(15/(90*16))
+     Gamma3 =  (data_info.inverse_temp^6)*(63/(945*64))
+
+     for iw = 1:N_Matsubara
       z = ((2.*iw-1)*pi/data_info.inverse_temp);
-      Gamma1 +=      (1/z  )^2
-      Gamma2 +=      (1/z^2)^2
-      Gamma3 +=      (1/z^3)^2
+      Gamma1 -=      ((1/z  )^2)
+      Gamma2 -=      ((1/z^2)^2)
+      Gamma3 -=      ((1/z^3)^2)
      end
+
+#     for iw = N_Matsubara:1e4*N_Matsubara
+#      z = ((2.*iw-1)*pi/data_info.inverse_temp);
+#      Gamma1 +=      ((1/z  )^2)
+#      Gamma2 +=      ((1/z^2)^2)
+#      Gamma3 +=      ((1/z^3)^2)
+#     end
      
      
      println("Gamma1:",Gamma1)
@@ -840,8 +877,9 @@
 
 #     kernel.gamma[4,4] = Gamma4
 #     kernel.gamma[5,5] = Gamma5 
-#     kernel.gamma[1,3] = Gamma2 
-#     kernel.gamma[3,1] = Gamma2 
+
+     kernel.gamma[1,3] = Gamma2 
+     kernel.gamma[3,1] = Gamma2 
   
   
       kernel.gamma = Hermitian(kernel.gamma)
@@ -855,15 +893,55 @@
   #        =   Aw[l+1]*(w-E[l])/dSegment[l] - Aw[l]*[(w-{E[l]+dSegment[l]}]/dSegment[l];
   #        =   Aw[l+1]*(w-E[l])/dSegment[l] - Aw[l]*[(w- E[l+1]]/dSegment[l];
   
-     for l=1:numeric.Egrid-1
-      for j=1:5
-        b =  ( numeric.ERealAxis[l+1]^(j+1) - numeric.ERealAxis[l]^(j+1) )/(j+1) - numeric.ERealAxis[l]   *  ( numeric.ERealAxis[l+1]^(j) - numeric.ERealAxis[l]^(j) )/(j) 
-        c = -( numeric.ERealAxis[l+1]^(j+1) - numeric.ERealAxis[l]^(j+1) )/(j+1) + numeric.ERealAxis[l+1] *  ( numeric.ERealAxis[l+1]^(j) - numeric.ERealAxis[l]^(j) )/(j) 
-        kernel.moment[j,l+1] +=   (b/dSegment[l])
-        kernel.moment[j,l  ] +=   (c/dSegment[l])
-  
-      end
+
+#     kernel.cubic_coeff_transf[:,:] = (inv(B) * T)[:,:]
+
+# F(wj,w)=\int dw w^m*(w-wj)^l    ;gml(wj,dw) =  F(wj, wj+dw)
+
+     g0a(wj, dw ) =  1./4. * dw^4
+     g0b(wj, dw ) =  1./3. * dw^3
+     g0c(wj, dw ) =  1./2. * dw^2
+     g0d(wj, dw ) =  1./1. * dw^1
+
+     g1a(wj, dw ) =  1./5. * dw^5 +  wj/4. * dw^4
+     g1b(wj, dw ) =  1./4. * dw^4 +  wj/3. * dw^3
+     g1c(wj, dw ) =  1./3. * dw^3 +  wj/2. * dw^2
+     g1d(wj, dw ) =  1./2. * dw^2 +  wj/1. * dw^1
+
+     g2a(wj, dw ) =  1./6. * dw^6 +  (2*wj)/5. * dw^5 + wj^2/4 * dw^4
+     g2b(wj, dw ) =  1./5. * dw^5 +  (2*wj)/4. * dw^4 + wj^2/3 * dw^3
+     g2c(wj, dw ) =  1./3. * dw^4 +  (2*wj)/3. * dw^3 + wj^2/2 * dw^2
+     g2d(wj, dw ) =  1./3. * dw^3 +  (2*wj)/2. * dw^2 + wj^2/1 * dw^1
+
+     moment_from_cubic = zeros(Complex128, 3, num_seg_coeff)
+     for j=1:numeric.Egrid-1
+	     wj = numeric.ERealAxis[j]
+	     moment_from_cubic[1,4*(j-1)+1] = g0a(wj, dSegment[j]) - g0a(wj, 0)
+	     moment_from_cubic[1,4*(j-1)+2] = g0b(wj, dSegment[j]) - g0a(wj, 0)
+	     moment_from_cubic[1,4*(j-1)+3] = g0c(wj, dSegment[j]) - g0a(wj, 0)
+	     moment_from_cubic[1,4*(j-1)+4] = g0d(wj, dSegment[j]) - g0a(wj, 0)
+
+	     moment_from_cubic[2,4*(j-1)+1] = g1a(wj, dSegment[j]) - g1a(wj, 0)
+	     moment_from_cubic[2,4*(j-1)+2] = g1b(wj, dSegment[j]) - g1a(wj, 0)
+	     moment_from_cubic[2,4*(j-1)+3] = g1c(wj, dSegment[j]) - g1a(wj, 0)
+	     moment_from_cubic[2,4*(j-1)+4] = g1d(wj, dSegment[j]) - g1a(wj, 0)
+
+	     moment_from_cubic[3,4*(j-1)+1] = g2a(wj, dSegment[j]) - g2a(wj, 0)
+	     moment_from_cubic[3,4*(j-1)+2] = g2b(wj, dSegment[j]) - g2a(wj, 0)
+	     moment_from_cubic[3,4*(j-1)+3] = g2c(wj, dSegment[j]) - g2a(wj, 0)
+	     moment_from_cubic[3,4*(j-1)+4] = g2d(wj, dSegment[j]) - g2a(wj, 0)
      end
+     kernel.moment  = moment_from_cubic *  inv(B) *T
+
+
+#     for l=1:numeric.Egrid-1
+#      for j=1:5
+#        b =  ( numeric.ERealAxis[l+1]^(j+1) - numeric.ERealAxis[l]^(j+1) )/(j+1) - numeric.ERealAxis[l]   *  ( numeric.ERealAxis[l+1]^(j) - numeric.ERealAxis[l]^(j) )/(j) 
+#        c = -( numeric.ERealAxis[l+1]^(j+1) - numeric.ERealAxis[l]^(j+1) )/(j+1) + numeric.ERealAxis[l+1] *  ( numeric.ERealAxis[l+1]^(j) - numeric.ERealAxis[l]^(j) )/(j) 
+#        kernel.moment[j,l+1] +=   (b/dSegment[l])
+#        kernel.moment[j,l  ] +=   (c/dSegment[l])
+#      end
+#     end
      
      
      for l=1:numeric.Egrid
@@ -873,8 +951,8 @@
        end
      end
      for l=1:numeric.Egrid
-      for j=1:5
-	      kernel.moment_dagger[l  ,j] =  numeric.ERealAxis[l]^(j-1)
+      for mom=1:3
+	      kernel.moment_dagger[l  ,mom] =  numeric.ERealAxis[l]^(mom-1)
       end
      end
   
@@ -882,210 +960,141 @@
      return kernel
   end
   
-  
-  
-  
-  
-  
-  
-   #=
-  function construct_Kernel_linear!( numeric::strNumeric)
-  
-     N_Matsubara = numeric.N_Matsubara
-     ERealAxis = numeric.ERealAxis
-    dERealAxis = numeric.dERealAxis
-  
-  
-     kernel = strKernel(
-      auxiliary_inverse_temp_range
-     ,zeros(Complex128, N_Matsubara, numeric.Egrid)
-     ,zeros(Float64, 5, numeric.Egrid)
-     ,zeros(Complex128, numeric.Egrid, numeric.Egrid)
-     ,zeros(Complex128, 4*(numeric.Egrid-1),numeric.Egrid)
-     ,zeros(Complex128, 5,5)
-     )
-  
-  
-  
-  
-  # #=
-     num_seg_coeff = 2*(numeric.Egrid-1)
-     dSegment=[] 
-     for j=1:numeric.Egrid-1
-       push!(dSegment, ERealAxis[j+1] - ERealAxis[j]) 
-     end
-     T = zeros(Float64, num_seg_coeff,  numeric.Egrid)
-     B = zeros(Float64, num_seg_coeff, num_seg_coeff)
-     Kernel_from_cubic= zeros(Complex128, N_Matsubara, num_seg_coeff)
-  
-  
-     for j=1:numeric.Egrid-1
-       T[2*(j-1)+1, j]   =1.0
-       T[2*(j-1)+2, j+1] =1.0
-     end
-  
-     for j=1:numeric.Egrid-1
-         s = 2*(j-1)
-         B[s+1, s+2] = 1
-  
-         B[s+2, s+1] = (dSegment[j])^1
-         B[s+2, s+2] = 1
-     end
-  
-  
-     f3(iwn, wj, w ) =  -w                                      -(iwn-wj)   * log(-iwn + wj +w)
-     f4(iwn, wj, w ) =                                          -             log(-iwn + wj +w)
-  
-     for n=1:N_Matsubara
-      iwn = ((2.*n-1)*pi/inverse_temp)im;
-      for j=1:numeric.Egrid-1
-         wj = ERealAxis[j] 
-         Kernel_from_cubic[n,2*(j-1)+1] = f3(iwn, wj, dSegment[j]) - f3(iwn, wj, 0)
-         Kernel_from_cubic[n,2*(j-1)+2] = f4(iwn, wj, dSegment[j]) - f4(iwn, wj, 0)
-      end
-     end
-  # =#
-  
-  kernel.Kernel[:,:] = Kernel_from_cubic*  inv(B) * T
-  end
-  # =#
+
+
+
 
 
 #  module default_model
-         using NLsolve
-         function p2ABC(p::Array{Float64},dim::Int64)
-         
-             A=zeros(Complex128,dim,dim)
-             B=zeros(Complex128,dim,dim)
-             C=zeros(Complex128,dim,dim)
-             for i=1:dim
-                 A[i,i]=p[i]
-                 B[i,i]=p[dim+i]
-             end
-             for i=1:dim-1
-                 C[i,i]=p[2*dim+i]
-             end
-             C-=trace(C)/dim
-             
-              s=div(dim*(dim-1),2)
-              offd=3*dim-1
-              A += vec2utri( p[offd+1:(offd)+s],   p[offd+s+1:offd+2s]  ,dim)
-              B += vec2utri( p[offd+2s+1:offd+3s], p[offd+3s+1:offd+4s] ,dim)
-              C += vec2utri( p[offd+4s+1:offd+5s], p[offd+5s+1:offd+6s] ,dim)
-         
-             A= Hermitian(A)
-             B= Hermitian(B)
-             C= Hermitian(C)
-             return (A,B,C)
-         end
-         
-         
-         function vec2utri(u::Array{Float64},v::Array{Float64},dim::Int64)
-             A=zeros(Complex128,dim,dim)
-             t=1
-             for i=1:dim
-                 for j=i+1:dim
-                     A[i,j]=u[t]+im*v[t]
-                     t+=1
-                 end
-             end
-             return A
-         end
-         
-         
-         function utr2vec(A::Hermitian{Complex{Float64},Array{Complex{Float64},2}},dim::Int64)
-             s=div((dim*(dim-1)),2)
-             u=zeros(Float64,2s)
-             t=1
-             Ar= real(A)
-             Ai= imag(A)
-             for i=1:dim
-                 for j=i+1:dim
-                     u[t]=Ar[i,j]
-                     u[s+t]=Ai[i,j]
-                     t+=1
-                 end
-             end
-             return u
-         end
-         
-         
-         
-         function gaussianPotential!(imagFreqFtn::strImagFreqFtn, realFreqFtn::strRealFreqFtn, kernel::strKernel, numeric::strNumeric, xinit, Aw::Array{Array{Complex128,2}})
+using NLsolve
+function p2ABC(p::Array{Float64},dim::Int64)
+
+    A=zeros(Complex128,dim,dim)
+    B=zeros(Complex128,dim,dim)
+    C=zeros(Complex128,dim,dim)
+    for i=1:dim
+        A[i,i]=p[i]
+        B[i,i]=p[dim+i]
+    end
+    for i=1:dim-1
+        C[i,i]=p[2*dim+i]
+    end
+    C-=trace(C)/dim
+    
+     s=div(dim*(dim-1),2)
+     offd=3*dim-1
+     A += vec2utri( p[offd+1:(offd)+s],   p[offd+s+1:offd+2s]  ,dim)
+     B += vec2utri( p[offd+2s+1:offd+3s], p[offd+3s+1:offd+4s] ,dim)
+     C += vec2utri( p[offd+4s+1:offd+5s], p[offd+5s+1:offd+6s] ,dim)
+
+    A= Hermitian(A)
+    B= Hermitian(B)
+    C= Hermitian(C)
+    return (A,B,C)
+end
+
+
+function vec2utri(u::Array{Float64},v::Array{Float64},dim::Int64)
+    A=zeros(Complex128,dim,dim)
+    t=1
+    for i=1:dim
+        for j=i+1:dim
+            A[i,j]=u[t]+im*v[t]
+            t+=1
+        end
+    end
+    return A
+end
+
+
+function utr2vec(A::Hermitian{Complex{Float64},Array{Complex{Float64},2}},dim::Int64)
+    s=div((dim*(dim-1)),2)
+    u=zeros(Float64,2s)
+    t=1
+    Ar= real(A)
+    Ai= imag(A)
+    for i=1:dim
+        for j=i+1:dim
+            u[t]=Ar[i,j]
+            u[s+t]=Ai[i,j]
+            t+=1
+        end
+    end
+    return u
+end
 
 
 
-         Egrid = numeric.Egrid
-         dim=size(imagFreqFtn.moments1)[1]
-         ##=
-         function getABC2(F::Array{Float64}, p::Array{Float64})
-             (A,B,C)=p2ABC(p,dim)
-         
-             E0=Array{Float64}(numeric.Egrid)
-         
-             local_trace_value =  Array{Float64}(Egrid)
-             for w=1:Egrid
-         #        realFreqFtn.H_extern[w] = Hermitian( A * kernel.moment[3,w] + B* kernel.moment[2,w] + C * kernel.moment[1,w]  ) 
-                 realFreqFtn.H_extern[w] =  - Hermitian( A * numeric.ERealAxis[w]^2 + B* numeric.ERealAxis[w]+ C  ) 
-                 E0[w]=eigmin(Hermitian(realFreqFtn.H_extern[w]))
-             end
-             chempot = minimum(E0)
+function gaussianPotential!(imagFreqFtn::strImagFreqFtn, realFreqFtn::strRealFreqFtn, kernel::strKernel, numeric::strNumeric, xinit, Aw::Array{Array{Complex128,2}})
 
 
-             for w=1:Egrid
-#                 Aw[w], local_trace_value[w]       = density_matrix_constructor(  )
-		 Aw[w] = Hermitian(expm(Hermitian( - (realFreqFtn.H_extern[w] -chempot *eye(realFreqFtn.H_extern[w]))  )))
-		 local_trace_value[w] = trace(Aw[w])
-             end
-             #sum_rule
-             TotalPartitionFtn =  kernel.moment[1,:]'local_trace_value
-             for w=1:numeric.Egrid
-               Aw[w] *= 1./TotalPartitionFtn
-             end
-         
-             mw = kernel.moment * Aw
-             x=Hermitian(mw[1])
-             y=Hermitian(mw[2])
-             z=Hermitian(mw[3])
-         
-             x=Hermitian(imagFreqFtn.moments1-  mw[1])
-             y=Hermitian(imagFreqFtn.moments2-  mw[2])
-             z=Hermitian(imagFreqFtn.moments3-  mw[3])
-             x[dim,dim]=0
-         
-             for i=1:dim
-               F[i]     = y[i,i]
-               F[dim+i] = z[i,i]
-             end
-             for i=1:dim-1
-               F[2dim+i] = x[i,i]
-             end
-         
-             s=div(dim*(dim-1),2)
-             offd = 3dim-1
-             F[offd+1:offd+2s] = utr2vec(y,dim)
-             F[offd+2s+1:offd+4s] = utr2vec(z,dim)
-             F[offd+4s+1:offd+6s] = utr2vec(x,dim)
-         
-         end
-         # =#
-         
-         
-         
-         result=nlsolve(getABC2, xinit, xtol = 1e-5, ftol=1e-10 )
-         xfinal = result.zero
-         
-         
-         (A, B, C) = p2ABC(xfinal,dim)
-         
-         println( result  )
-         println("Model gaussian A: ", A)
-         println("Model gaussian B: ", B)
-         println("Model gaussian C: ", C)
-         
-         return xfinal
-         
-         end
+
+    Egrid = numeric.Egrid
+    dim=size(imagFreqFtn.moments1)[1]
+    ##=
+    function getABC2(F::Array{Float64}, p::Array{Float64})
+        (A,B,C)=p2ABC(p,dim)
+    
+        E0=Array{Float64}(numeric.Egrid)
+    
+        local_trace_value =  Array{Float64}(Egrid)
+        for w=1:Egrid
+            realFreqFtn.H_extern[w] =  - Hermitian( A * numeric.ERealAxis[w]^2 + B* numeric.ERealAxis[w]+ C  ) 
+            E0[w]=eigmin(Hermitian(realFreqFtn.H_extern[w]))
+        end
+        chempot = minimum(E0)
+    
+    
+        for w=1:Egrid
+            Aw[w] = Hermitian(expm(Hermitian( - (realFreqFtn.H_extern[w] -chempot *eye(realFreqFtn.H_extern[w]))  )))
+            local_trace_value[w] = trace(Aw[w])
+        end
+        #sum_rule
+        TotalPartitionFtn =  kernel.moment[1,:]'local_trace_value
+        for w=1:numeric.Egrid
+          Aw[w] *= 1./TotalPartitionFtn
+        end
+    
+        mw = kernel.moment * Aw
+        x=Hermitian(mw[1])
+        y=Hermitian(mw[2])
+        z=Hermitian(mw[3])
+    
+        x=Hermitian(imagFreqFtn.moments1-  mw[1])
+        y=Hermitian(imagFreqFtn.moments2-  mw[2])
+        z=Hermitian(imagFreqFtn.moments3-  mw[3])
+        x[dim,dim]=0
+    
+        for i=1:dim
+          F[i]     = y[i,i]
+          F[dim+i] = z[i,i]
+        end
+        for i=1:dim-1
+          F[2dim+i] = x[i,i]
+        end
+    
+        s=div(dim*(dim-1),2)
+        offd = 3dim-1
+        F[offd+1:offd+2s] = utr2vec(y,dim)
+        F[offd+2s+1:offd+4s] = utr2vec(z,dim)
+        F[offd+4s+1:offd+6s] = utr2vec(x,dim)
+    
+    end
+    # =#
+    result=nlsolve(getABC2, xinit, xtol = 1e-5, ftol=1e-10 )
+    xfinal = result.zero
+    
+    
+    (A, B, C) = p2ABC(xfinal,dim)
+    
+    println( result  )
+    println("Model gaussian A: ", A)
+    println("Model gaussian B: ", B)
+    println("Model gaussian C: ", C)
+    
+    return xfinal
+
+end
 
 
 #         export gaussianPotential!
