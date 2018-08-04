@@ -36,10 +36,7 @@ mutable struct strKernel
  smooth::Array{Complex128,2}
  cubic_coeff_transf::Array{Complex128,2}
  gamma::Array{Complex128,2}
-# svdInfo
-# svdmax::Int64
-# svdKernel
-# svdinteraction_V
+ partial::Array{Complex128,2}
 end
 
 mutable struct strNumeric
@@ -80,6 +77,8 @@ end
  end
  struct mem_fit_parm_
   default_model  
+  Model_range_right
+  Model_range_left
   auxiliary_inverse_temp_range 
   auxTempRenomalFactorInitial  
  end

@@ -40,9 +40,8 @@
              EnergyMatrix = (imagFreqFtn.GreenFtn[n] - GreenReproduced)
              Energy    +=    (vecnorm(EnergyMatrix)^2)
           end
+
           moments =  kernel.moment * Aw
-
-
           temp = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3 ] - moments
 	  Energy_tail=0;
 	  for mom = 1:3
@@ -63,17 +62,19 @@
   function matrixFtn_norm( Aw::Array{Array{Complex128,2}} , weight::Array{Float64})
               # 1-norm, \int dw abs(A) = sum(abs(A))
               lengthOfVector = length(Aw)
-              normVector_temp = 0.0
+	      normVector_temp = Array{Float64}(lengthOfVector)
               for w=1:lengthOfVector
-                    normVector_temp  +=  (norm(Aw[w]))^2 *weight[w]
+		      normVector_temp[w]  =  (vecnorm(Aw[w]))^2  *weight[w]
               end
-	      return sqrt( normVector_temp )
+#	      res = dot(normVector_temp,weight)::Float64
+	      res = sum(normVector_temp)
+	      return sqrt(  abs(res)  )
   end
   
   
   
   
-  function construct_model_spectrum(Green_Inf::Hermitian{Complex{Float64},Array{Complex{Float64},2}}, numeric, NumSubOrbit::Int64,  center::Float64,  eta::Float64 , shape::String)
+  function construct_model_spectrum(Green_Inf::Hermitian{Complex{Float64},Array{Complex{Float64},2}}, numeric, mem_fit_parm::mem_fit_parm_, NumSubOrbit::Int64,  center::Float64,  eta::Float64 , shape::String)
       Spectral_default_model =  Array{Array{Complex128,2}}(numeric.Egrid)
      for w = 1:numeric.Egrid
          E = numeric.ERealAxis[w]
@@ -82,7 +83,11 @@
          elseif(shape == "L")
            Spectral_default_model[w] = (Green_Inf * 1/( (E-center)^2 + eta^2) +1e-30*(eye(Green_Inf)) )
          elseif(shape == "F")
-		 Spectral_default_model[w] = 1/(numeric.ERealAxis[numeric.Egrid]-numeric.ERealAxis[1]) * eye(Green_Inf) 
+		 if(mem_fit_parm.Model_range_left<E &&  E<mem_fit_parm.Model_range_right)
+		   Spectral_default_model[w] = 1/(mem_fit_parm.Model_range_right-mem_fit_parm.Model_range_left) * eye(Green_Inf) 
+	         else
+		   Spectral_default_model[w] = 0.0* eye(Green_Inf) 
+	         end
          end
      end
      model_norm = trace(sum(Spectral_default_model))
@@ -175,7 +180,7 @@
 	      local_trace_value[w] = trace(Aw_out[w])
           end
           #sum_rule
-          TotalPartitionFtn =  kernel.moment[1,:]'local_trace_value
+	  TotalPartitionFtn =  dot(kernel.moment[1,:],local_trace_value)
           for w=1:numeric.Egrid
             Aw_out[w] *= 1./TotalPartitionFtn
           end
@@ -213,7 +218,8 @@
   
       criteria_Aw_Initial =0.0
       criteria_Aw_prev100 = 0.0
-      totE_prev100 = 0.0
+
+      resd_totE=0
   
       mixing_local = mixing
       Aw_out =           Array{Array{Complex128,2}}(numeric.Egrid)
@@ -232,23 +238,28 @@
           if iter==0
               #estimate criteria
               resdAw = Aw_in - Aw_out
-              criteria_Aw_prev100 =  matrixFtn_norm(resdAw, numeric.dERealAxis) ;
+	      criteria_Aw_prev100 =  matrixFtn_norm(resdAw, numeric.dERealAxis) ;
           end
   
           if iter%10 == 0  || iter == 1
               #estimate criteria
               resdAw = Aw_in - Aw_out
-              criteria_Aw =  matrixFtn_norm(resdAw, numeric.dERealAxis) ;
+	      criteria_Aw =  matrixFtn_norm(resdAw,numeric.dERealAxis) ;
   
-                if(  criteria_Aw < 1e-12*NumSubOrbit     )
+                if(  criteria_Aw < 1e-6*NumSubOrbit     )
 	          E_in = get_total_energy(imagFreqFtn, Aw_in, kernel, numeric)
 	          E_out = get_total_energy(imagFreqFtn, Aw_out, kernel, numeric)
-		  if( abs(E_in-E_out) < 1e-8 )
+		  resd_totE =  abs(E_in-E_out)
+
+		  if( resd_totE < 1e-10 )
 			  converg = true
 			  realFreqFtn.Hw[:] = Hamiltonian_in
 			  break
 		  end
-                elseif(   ( (iter > numeric.NumIter &&  criteria_Aw > criteria_Aw_prev100) || criteria_Aw > criteria_Aw_prev100 *10)    )
+                elseif(   ( (iter > numeric.NumIter &&  criteria_Aw > criteria_Aw_prev100) || criteria_Aw > criteria_Aw_prev100*2 )    )
+	          E_in = get_total_energy(imagFreqFtn, Aw_in, kernel, numeric)
+	          E_out = get_total_energy(imagFreqFtn, Aw_out, kernel, numeric)
+		  resd_totE =  abs(E_in-E_out)
                   converg = false
                   break
                 end
@@ -257,9 +268,10 @@
           end 
           #Prepare next iteration
           Aw_in = pulayMixing!(iter, mixing_local, Aw_in,   Aw_out-Aw_in, numeric.dERealAxis, MixingInformation)
+#          Aw_in = pulayMixing!(iter, mixing_local, Aw_in,   Aw_out-Aw_in, kernel, MixingInformation)
           iter += 1
       end #end of iteration
-      return ( Aw_in  ,   converg,   criteria_Aw, iter)
+      return ( Aw_in  ,   converg,   criteria_Aw, resd_totE, iter)
   end
   
   
@@ -279,6 +291,7 @@
       alpha_list = Array{Float64}(0)
       mixing =  0.0::Float64
       Aw = deepcopy(realFreqFtn.Aw)
+      Aw_SVD = deepcopy(realFreqFtn.Aw)
       auxTempRenomalFactor = deepcopy(mem_fit_parm.auxTempRenomalFactorInitial)
       NumSubOrbit = size(imagFreqFtn.GreenFtn[1])[1]
       workDirect =  data_info.workDirect
@@ -292,7 +305,23 @@
       
       auxiliary_inverse_temp_prev = deepcopy(auxiliary_inverse_temp)
       
-      
+            
+      #fast continuation: SVD, Pade, naive
+      #SVD
+    KMsvdf = svdfact(kernel.Kernel , thin=false)
+    Gl = (KMsvdf[:U]') * imagFreqFtn.GreenFtn
+    Dl =  KMsvdf[:Vt]  * realFreqFtn.Spectral_default_model
+    Al = deepcopy(Dl)
+    num=0
+    for l=1:length(KMsvdf[:S])
+	    if( KMsvdf[:S][l] > 1e-3)
+		    Al[l] = 1/(KMsvdf[:S][l]) * Gl[l]
+		    num+=1
+	    end
+    end
+    println("SVD method : number of eigenvectors used : $(num)") 
+    Aw_SVD =   (KMsvdf[:Vt]') * Al
+    write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw_SVD, fname_out,  "_SVD")
       
       
       mixingPrev = deepcopy(mixing)
@@ -305,7 +334,7 @@
       
       
       
-          (Aw,  converg,   normAwRD, iter) = Aw_Iteration(realFreqFtn, imagFreqFtn, kernel, auxiliary_inverse_temp, NumSubOrbit, numeric, mixing, mixing_parm)
+          (Aw,  converg,   normAwRD, resd_totE, iter) = Aw_Iteration(realFreqFtn, imagFreqFtn, kernel, auxiliary_inverse_temp, NumSubOrbit, numeric, mixing, mixing_parm)
           mixingNext =  min( mixing*1.001, numeric.mixing_max)
           if !(converg)
             mixingNext =   max( mixing / 1.1, numeric.mixing_min)
@@ -314,9 +343,9 @@
           trial = 0
           while !(converg)
             trial+=1
-            println("not converged... $(auxiliary_inverse_temp_prev)\t$(auxiliary_inverse_temp)\tmixing:$(mixing); Iter:$(iter)  normAw:$(normAwRD) trial:$(trial)")
+	    println("not converged... $(auxiliary_inverse_temp_prev)\t$(auxiliary_inverse_temp)\tmixing:$(mixing); Iter:$(iter)  Resd_Aw:$(normAwRD) Resd_TotE:$(resd_totE) trial:$(trial)")
             auxiliary_inverse_temp = 0.05 * (auxiliary_inverse_temp) + 0.95* (auxiliary_inverse_temp_prev);
-          (Aw, converg,   normAwRD,iter) = Aw_Iteration(realFreqFtn, imagFreqFtn,kernel, auxiliary_inverse_temp, NumSubOrbit, numeric,mixing, mixing_parm)
+          (Aw, converg,   normAwRD, resd_totE, iter) = Aw_Iteration(realFreqFtn, imagFreqFtn,kernel, auxiliary_inverse_temp, NumSubOrbit, numeric,mixing, mixing_parm)
             if trial==10 break end
           end
           if trial==10 break end
@@ -743,6 +772,7 @@
      ,zeros(Complex128, numeric.Egrid, numeric.Egrid)
      ,zeros(Complex128, 4*(numeric.Egrid-1),numeric.Egrid)
      ,zeros(Complex128, 3,3)
+     ,zeros(Complex128,numeric.Egrid, numeric.Egrid)
      )
   
   
@@ -885,6 +915,7 @@
       kernel.gamma = Hermitian(kernel.gamma)
       
      
+
      
      
   #moment[j.:] Aw[:] = \int w^(j-1) A(w).,               
@@ -894,7 +925,6 @@
   #        =   Aw[l+1]*(w-E[l])/dSegment[l] - Aw[l]*[(w- E[l+1]]/dSegment[l];
   
 
-#     kernel.cubic_coeff_transf[:,:] = (inv(B) * T)[:,:]
 
 # F(wj,w)=\int dw w^m*(w-wj)^l    ;gml(wj,dw) =  F(wj, wj+dw)
 
@@ -934,14 +964,6 @@
      kernel.moment  = moment_from_cubic *  inv(B) *T
 
 
-#     for l=1:numeric.Egrid-1
-#      for j=1:5
-#        b =  ( numeric.ERealAxis[l+1]^(j+1) - numeric.ERealAxis[l]^(j+1) )/(j+1) - numeric.ERealAxis[l]   *  ( numeric.ERealAxis[l+1]^(j) - numeric.ERealAxis[l]^(j) )/(j) 
-#        c = -( numeric.ERealAxis[l+1]^(j+1) - numeric.ERealAxis[l]^(j+1) )/(j+1) + numeric.ERealAxis[l+1] *  ( numeric.ERealAxis[l+1]^(j) - numeric.ERealAxis[l]^(j) )/(j) 
-#        kernel.moment[j,l+1] +=   (b/dSegment[l])
-#        kernel.moment[j,l  ] +=   (c/dSegment[l])
-#      end
-#     end
      
      
      for l=1:numeric.Egrid
@@ -955,6 +977,22 @@
 	      kernel.moment_dagger[l  ,mom] =  numeric.ERealAxis[l]^(mom-1)
       end
      end
+
+
+
+     #differential
+     partial_from_cubic  = zeros(Complex128,numeric.Egrid, num_seg_coeff)
+     for l=1:numeric.Egrid-1
+	     partial_from_cubic[l,4*(l-1)+1] = 0
+	     partial_from_cubic[l,4*(l-1)+2] = 0
+	     partial_from_cubic[l,4*(l-1)+3] = 1
+	     partial_from_cubic[l,4*(l-1)+4] = 0
+     end
+     partial_from_cubic[numeric.Egrid,4*(numeric.Egrid-1-1)+1] = 3*dSegment[numeric.Egrid-1]^2
+     partial_from_cubic[numeric.Egrid,4*(numeric.Egrid-1-1)+2] = 2*dSegment[numeric.Egrid-1]
+     partial_from_cubic[numeric.Egrid,4*(numeric.Egrid-1-1)+3] = 1
+     partial_from_cubic[numeric.Egrid,4*(numeric.Egrid-1-1)+4] = 0
+     kernel.partial = partial_from_cubic * inv(B) * T
   
   
      return kernel

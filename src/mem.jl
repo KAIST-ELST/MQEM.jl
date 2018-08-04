@@ -4,57 +4,14 @@
 ###########################################
 # Jae-Hoon Sim, KAIST 2018.01.
 #2018.07.13
+#2018.08.03
 ###########################################
-
-#version info:
-
-
-
-#=
-#phys
- inverse_temp
- NumFullOrbit
- num_of_subblock
-  #phys.MatFtn
-    GreenFtn
-    GreenConstFull
-    GreenConst
-    Green_Inf
-    Green
-    GreenFtn_rep
-  #phys.RealFreqFtn
-    Spectral_default_model
-    Aw_RealPart
-    Aw
-    Aw_in
-  
-#Kernel
- auxiliary_inverse_temp
- Kernel
- interaction_V
-
-#Numeric
- Egrid
- N_Matsubara
- NumIter
- mixing_min
- mixing_max
- mixing
- pulay_mixing_history
- pulay_mixing_step
- pulay_mixing_start
-=#
 
 
 
 using LsqFit
 import TOML
 
-#include("mem_variable.jl")
-#include("/home/users1/jhsim/Dropbox/src/TB_DMFT/MQEM/src/mem_variable.jl")
-#include("/home/users1/jhsim/Dropbox/src/TB_DMFT/MQEM/src/mem_ftn_def.jl")
-#include("/home/users1/jhsim/Dropbox/src/TB_DMFT/MQEM/src/mem_pulay.jl")
-#include("/home/users1/jhsim/Dropbox/src/TB_DMFT/MQEM/src/mem_write_data.jl")
 
 
 using MQEM
@@ -118,11 +75,15 @@ real_freq_grid_info= real_freq_grid_info_(EwinOuterRight,
 					   EgridInner
 					   )
 
-default_model  = input_ftn("default_model","g")
+default_model  = input_ftn("default_model" ,"g")
+Model_range_right = input_ftn("Model_right",EwinOuterRight)
+Model_range_left  = input_ftn("Model_left" ,EwinOuterLeft)
 auxiliary_inverse_temp_range = input_ftn("auxiliary_inverse_temp_range")
 auxTempRenomalFactorInitial  = input_ftn("auxTempRenomalFactorInitial", 0.01)
 
 mem_fit_parm= mem_fit_parm_(default_model,
+			    Model_range_right,
+			    Model_range_left,
 			     auxiliary_inverse_temp_range,
 			     auxTempRenomalFactorInitial
 			     )
@@ -260,7 +221,7 @@ for cluster=start_cluster:num_of_subblock-1
     
     
     if(default_model=="f") #flat default_model
-      realFreqFtn.Spectral_default_model = construct_model_spectrum(imagFreqFtn.moments1, numeric, phyParm.NumSubOrbit, trace(imagFreqFtn.moments2), sigmaFlat,"F")
+      realFreqFtn.Spectral_default_model = construct_model_spectrum(imagFreqFtn.moments1, numeric,inputInfo.mem_fit_parm,  phyParm.NumSubOrbit, trace(imagFreqFtn.moments2), sigmaFlat,"F")
     elseif(default_model=="g")  #gaussian default_model
       Ainit= Hermitian(-1.0/(2*sigma^2) *eye(imagFreqFtn.moments2))
       Binit= Hermitian(-( trace(imagFreqFtn.moments2) / sigma^2)*eye(imagFreqFtn.moments2))
