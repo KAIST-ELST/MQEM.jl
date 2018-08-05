@@ -74,23 +74,27 @@
   
   
   
-  function construct_model_spectrum(Green_Inf::Hermitian{Complex{Float64},Array{Complex{Float64},2}}, numeric, mem_fit_parm::mem_fit_parm_, NumSubOrbit::Int64,  center::Float64,  eta::Float64 , shape::String)
+  function construct_model_spectrum(Green_Inf::Hermitian{Complex{Float64},Array{Complex{Float64},2}}, numeric, mem_fit_parm::mem_fit_parm_, NumSubOrbit::Int64,  center::Float64,  eta::Float64 , shape::String, kernel::strKernel)
       Spectral_default_model =  Array{Array{Complex128,2}}(numeric.Egrid)
+      trace_model =  Array{Float64}(numeric.Egrid)
      for w = 1:numeric.Egrid
          E = numeric.ERealAxis[w]
          if(shape == "G")
            Spectral_default_model[w] = Hermitian( (Green_Inf *( exp(-0.5 *((E-center)/eta)^2) + (1e-30)    ) ) )
+	   trace_model[w] = trace(Spectral_default_model[w])
          elseif(shape == "L")
            Spectral_default_model[w] = (Green_Inf * 1/( (E-center)^2 + eta^2) +1e-30*(eye(Green_Inf)) )
+	   trace_model[w] = trace(Spectral_default_model[w])
          elseif(shape == "F")
 		 if(mem_fit_parm.Model_range_left<E &&  E<mem_fit_parm.Model_range_right)
 		   Spectral_default_model[w] = 1/(mem_fit_parm.Model_range_right-mem_fit_parm.Model_range_left) * eye(Green_Inf) 
 	         else
 		   Spectral_default_model[w] = 0.0* eye(Green_Inf) 
 	         end
+	         trace_model[w] = trace(Spectral_default_model[w])
          end
      end
-     model_norm = trace(sum(Spectral_default_model))
+     model_norm = kernel.moment[1,:]'trace_model
   
   #no
   #   Spectral_default_model  /= model_norm
@@ -307,21 +311,77 @@
       
             
       #fast continuation: SVD, Pade, naive
+
       #SVD
-    KMsvdf = svdfact(kernel.Kernel , thin=false)
-    Gl = (KMsvdf[:U]') * imagFreqFtn.GreenFtn
+
+#Ref. :
+#Creffield et al., PRL 75, 517 (1995)
+#Gunnarsson et al., PRB 82, 165125 (2010)
+#    GreenFtn_full = Array{Array{Complex128,2}}(numeric.N_Matsubara)
+#    for n=1:numeric.N_Matsubara
+#	    GreenFtn_full[n] = imagFreqFtn.GreenFtn[n] 
+#    end
+#    push!(GreenFtn_full, imagFreqFtn.moments1)
+#    push!(GreenFtn_full, imagFreqFtn.moments2)
+#    push!(GreenFtn_full, imagFreqFtn.moments3)
+
+
+	    GreenFtn_full = imagFreqFtn.GreenFtn - kernel.Kernel * realFreqFtn.Spectral_default_model
+
+
+    SupportFtn = Array{Float64}(numeric.Egrid)
+    for j=1:numeric.Egrid
+	    E = numeric.ERealAxis[j]
+	    if abs(E) < 5.0
+		    SupportFtn[j]=1.0
+	    else
+		    SupportFtn[j] =  2.0/(1+(E/5.0)^8)
+	    end
+    end
+
+#    Kernel_full   =  [kernel.Kernel .* (SupportFtn'); kernel.moment] 
+#    Kernel_full   =  kernel.Kernel .* (SupportFtn')
+    Kernel_full   =  kernel.Kernel 
+    KMsvdf = svdfact(Kernel_full )
+
+    Gl = (KMsvdf[:U]') * GreenFtn_full
     Dl =  KMsvdf[:Vt]  * realFreqFtn.Spectral_default_model
     Al = deepcopy(Dl)
     num=0
     for l=1:length(KMsvdf[:S])
-	    if( KMsvdf[:S][l] > 1e-3)
+	    if( KMsvdf[:S][l] > 1e-5*KMsvdf[:S][1])
 		    Al[l] = 1/(KMsvdf[:S][l]) * Gl[l]
 		    num+=1
+	    else Al[l]= Gl[l]*0.0
 	    end
     end
+    Scut=KMsvdf[:S][1:num]
+    println(Scut)
+    println(inv(diagm( conj(Scut) .* Scut)))
+    println( diagm( 1./ (conj(Scut) .* Scut)   ))
     println("SVD method : number of eigenvectors used : $(num)") 
-    Aw_SVD =   (KMsvdf[:Vt]') * Al
-    write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw_SVD, fname_out,  "_SVD")
+
+#    Aw_naive = (  ((KMsvdf[:Vt]')  * diagm(1./ (KMsvdf[:S]+1e-5)) * (KMsvdf[:U]'))   * GreenFtn_full  )
+#    Aw_naive += realFreqFtn.Spectral_default_model
+
+    Aw_SVD1 = (  ((KMsvdf[:Vt]')[:,1:num]  * diagm(1./ (KMsvdf[:S][1:num])) * (KMsvdf[:U]')[1:num,:])   * GreenFtn_full  )
+    Aw_SVD1 += realFreqFtn.Spectral_default_model
+
+#    Aw_SVD2 =   (KMsvdf[:Vt]') * Al
+#    Aw_SVD2 += realFreqFtn.Spectral_default_model
+
+#    Aw_SVD3 = (  ((KMsvdf[:Vt]')[:,1:num]  * diagm( 1./ (conj(Scut) .* Scut)   ) * (KMsvdf[:Vt])[1:num,:])   * (Kernel_full')* GreenFtn_full  )
+#    Aw_SVD3 += realFreqFtn.Spectral_default_model
+
+
+#    write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw_naive, fname_out,  "_naive")
+    write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw_SVD1, fname_out,  "_SVD1")
+#    write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw_SVD2, fname_out,  "_SVD2")
+#    write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw_SVD3, fname_out,  "_SVD3")
+    ###################################
+
+#    write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw_SVD, fname_out,  "_SVD")
+    ####
       
       
       mixingPrev = deepcopy(mixing)

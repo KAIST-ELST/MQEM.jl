@@ -75,7 +75,7 @@ real_freq_grid_info= real_freq_grid_info_(EwinOuterRight,
 					   EgridInner
 					   )
 
-default_model  = input_ftn("default_model" ,"g")
+default_model  = input_ftn("default_model" ,"g_mat")
 Model_range_right = input_ftn("Model_right",EwinOuterRight)
 Model_range_left  = input_ftn("Model_left" ,EwinOuterLeft)
 auxiliary_inverse_temp_range = input_ftn("auxiliary_inverse_temp_range")
@@ -221,8 +221,16 @@ for cluster=start_cluster:num_of_subblock-1
     
     
     if(default_model=="f") #flat default_model
-      realFreqFtn.Spectral_default_model = construct_model_spectrum(imagFreqFtn.moments1, numeric,inputInfo.mem_fit_parm,  phyParm.NumSubOrbit, trace(imagFreqFtn.moments2), sigmaFlat,"F")
-    elseif(default_model=="g")  #gaussian default_model
+	    realFreqFtn.Spectral_default_model = 
+	    construct_model_spectrum(imagFreqFtn.moments1, numeric,inputInfo.mem_fit_parm,  phyParm.NumSubOrbit, 
+				     trace(imagFreqFtn.moments2), sigmaFlat,"F", kernel) 
+
+    elseif(default_model =="g")
+	    realFreqFtn.Spectral_default_model =
+	    construct_model_spectrum(imagFreqFtn.moments1, numeric,inputInfo.mem_fit_parm,  phyParm.NumSubOrbit,
+				     trace(imagFreqFtn.moments2), trace(imagFreqFtn.moments3)/phyParm.NumSubOrbit,"G", kernel)
+
+    elseif(default_model=="g_mat")  #gaussian default_model
       Ainit= Hermitian(-1.0/(2*sigma^2) *eye(imagFreqFtn.moments2))
       Binit= Hermitian(-( trace(imagFreqFtn.moments2) / sigma^2)*eye(imagFreqFtn.moments2))
       s= 3*phyParm.NumSubOrbit +2*3*(div(phyParm.NumSubOrbit*(phyParm.NumSubOrbit-1),2)) -1     # -1 come from the fact that C=trace less
