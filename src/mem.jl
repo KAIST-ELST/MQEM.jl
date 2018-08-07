@@ -250,7 +250,7 @@ for cluster=start_cluster:num_of_subblock-1
     end
     
     temp = deepcopy(realFreqFtn.Spectral_default_model)
-    write_spectral_ftn(phyParm.NumSubOrbit, imagFreqFtn.Normalization, numeric, temp, fname_out, "_model")
+    write_spectral_ftn(phyParm.NumSubOrbit, imagFreqFtn.Normalization, numeric, temp, kernel, fname_out, "_model")
     temp = []
     
 

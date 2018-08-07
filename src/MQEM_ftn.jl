@@ -13,6 +13,7 @@
 
 
 
+global blur_width = 0.5;
   function get_total_energy_for_tail(imagFreqFtn ,Aw::Array{Array{Complex128,2}}, kernel, numeric)
           NumSubOrbit        = size(Aw[1])[1]
           moments =  kernel.moment * Aw
@@ -74,9 +75,11 @@
   
   
   
-  function construct_model_spectrum(Green_Inf::Hermitian{Complex{Float64},Array{Complex{Float64},2}}, numeric, mem_fit_parm::mem_fit_parm_, NumSubOrbit::Int64,  center::Float64,  eta::Float64 , shape::String, kernel::strKernel)
-      Spectral_default_model =  Array{Array{Complex128,2}}(numeric.Egrid)
-      trace_model =  Array{Float64}(numeric.Egrid)
+  function construct_model_spectrum(Green_Inf::Hermitian{Complex{Float64},Array{Complex{Float64},2}}, numeric, mem_fit_parm::mem_fit_parm_, NumSubOrbit::Int64, 
+                                      center::Float64,  eta::Float64 , shape::String, kernel::strKernel)
+
+     Spectral_default_model =  Array{Array{Complex128,2}}(numeric.Egrid)
+     trace_model =  Array{Float64}(numeric.Egrid)
      for w = 1:numeric.Egrid
          E = numeric.ERealAxis[w]
          if(shape == "G")
@@ -87,7 +90,7 @@
 	   trace_model[w] = trace(Spectral_default_model[w])
          elseif(shape == "F")
 		 if(mem_fit_parm.Model_range_left<E &&  E<mem_fit_parm.Model_range_right)
-		   Spectral_default_model[w] = 1/(mem_fit_parm.Model_range_right-mem_fit_parm.Model_range_left) * eye(Green_Inf) 
+		   Spectral_default_model[w] = Green_Inf/(mem_fit_parm.Model_range_right-mem_fit_parm.Model_range_left) 
 	         else
 		   Spectral_default_model[w] = 0.0* eye(Green_Inf) 
 	         end
@@ -309,87 +312,13 @@
       
       auxiliary_inverse_temp_prev = deepcopy(auxiliary_inverse_temp)
       
-            
-      #fast continuation: SVD, Pade, naive
-
-      #SVD
-
-#Ref. :
-#Creffield et al., PRL 75, 517 (1995)
-#Gunnarsson et al., PRB 82, 165125 (2010)
-#    GreenFtn_full = Array{Array{Complex128,2}}(numeric.N_Matsubara)
-#    for n=1:numeric.N_Matsubara
-#	    GreenFtn_full[n] = imagFreqFtn.GreenFtn[n] 
-#    end
-#    push!(GreenFtn_full, imagFreqFtn.moments1)
-#    push!(GreenFtn_full, imagFreqFtn.moments2)
-#    push!(GreenFtn_full, imagFreqFtn.moments3)
-
-
-	    GreenFtn_full = imagFreqFtn.GreenFtn - kernel.Kernel * realFreqFtn.Spectral_default_model
-
-
-    SupportFtn = Array{Float64}(numeric.Egrid)
-    for j=1:numeric.Egrid
-	    E = numeric.ERealAxis[j]
-	    if abs(E) < 5.0
-		    SupportFtn[j]=1.0
-	    else
-		    SupportFtn[j] =  2.0/(1+(E/5.0)^8)
-	    end
-    end
-
-#    Kernel_full   =  [kernel.Kernel .* (SupportFtn'); kernel.moment] 
-#    Kernel_full   =  kernel.Kernel .* (SupportFtn')
-    Kernel_full   =  kernel.Kernel 
-    KMsvdf = svdfact(Kernel_full )
-
-    Gl = (KMsvdf[:U]') * GreenFtn_full
-    Dl =  KMsvdf[:Vt]  * realFreqFtn.Spectral_default_model
-    Al = deepcopy(Dl)
-    num=0
-    for l=1:length(KMsvdf[:S])
-	    if( KMsvdf[:S][l] > 1e-5*KMsvdf[:S][1])
-		    Al[l] = 1/(KMsvdf[:S][l]) * Gl[l]
-		    num+=1
-	    else Al[l]= Gl[l]*0.0
-	    end
-    end
-    Scut=KMsvdf[:S][1:num]
-    println(Scut)
-    println(inv(diagm( conj(Scut) .* Scut)))
-    println( diagm( 1./ (conj(Scut) .* Scut)   ))
-    println("SVD method : number of eigenvectors used : $(num)") 
-
-#    Aw_naive = (  ((KMsvdf[:Vt]')  * diagm(1./ (KMsvdf[:S]+1e-5)) * (KMsvdf[:U]'))   * GreenFtn_full  )
-#    Aw_naive += realFreqFtn.Spectral_default_model
-
-    Aw_SVD1 = (  ((KMsvdf[:Vt]')[:,1:num]  * diagm(1./ (KMsvdf[:S][1:num])) * (KMsvdf[:U]')[1:num,:])   * GreenFtn_full  )
-    Aw_SVD1 += realFreqFtn.Spectral_default_model
-
-#    Aw_SVD2 =   (KMsvdf[:Vt]') * Al
-#    Aw_SVD2 += realFreqFtn.Spectral_default_model
-
-#    Aw_SVD3 = (  ((KMsvdf[:Vt]')[:,1:num]  * diagm( 1./ (conj(Scut) .* Scut)   ) * (KMsvdf[:Vt])[1:num,:])   * (Kernel_full')* GreenFtn_full  )
-#    Aw_SVD3 += realFreqFtn.Spectral_default_model
-
-
-#    write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw_naive, fname_out,  "_naive")
-    write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw_SVD1, fname_out,  "_SVD1")
-#    write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw_SVD2, fname_out,  "_SVD2")
-#    write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw_SVD3, fname_out,  "_SVD3")
-    ###################################
-
-#    write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw_SVD, fname_out,  "_SVD")
-    ####
-      
       
       mixingPrev = deepcopy(mixing)
       mixingNext =  deepcopy(mixing)
       iter=0;
       while  auxiliary_inverse_temp  <=  end_temperature
           mixing = mixingNext
-          auxTempRenomalFactor = min(1+ ((auxTempRenomalFactor-1)*1.01)   , mem_fit_parm.auxTempRenomalFactorInitial)
+          auxTempRenomalFactor = min(1+ ((auxTempRenomalFactor-1)*1.01)   , 1.5*mem_fit_parm.auxTempRenomalFactorInitial)
           auxiliary_inverse_temp *= auxTempRenomalFactor;  
       
       
@@ -403,18 +332,20 @@
           trial = 0
           while !(converg)
             trial+=1
-	    println("not converged... $(auxiliary_inverse_temp_prev)\t$(auxiliary_inverse_temp)\tmixing:$(mixing); Iter:$(iter)  Resd_Aw:$(normAwRD) Resd_TotE:$(resd_totE) trial:$(trial)")
-            auxiliary_inverse_temp = 0.05 * (auxiliary_inverse_temp) + 0.95* (auxiliary_inverse_temp_prev);
-          (Aw, converg,   normAwRD, resd_totE, iter) = Aw_Iteration(realFreqFtn, imagFreqFtn,kernel, auxiliary_inverse_temp, NumSubOrbit, numeric,mixing, mixing_parm)
+            auxiliary_inverse_temp = 0.01 * (auxiliary_inverse_temp) + 0.99* (auxiliary_inverse_temp_prev);
+            (Aw, converg,   normAwRD, resd_totE, iter) = 
+                    Aw_Iteration(realFreqFtn, imagFreqFtn,kernel, auxiliary_inverse_temp, NumSubOrbit, numeric,mixing, mixing_parm)
             if trial==10 break end
           end
           if trial==10 break end
+	  print_stdout=2
+	  if converg &&   (auxiliary_inverse_temp - start_temperature)/(end_temperature-start_temperature) *100 > print_stdout
+		  println("Auxiliary_inverse_temp (alpha_inv): $(auxiliary_inverse_temp)")
+		  print_stdout += 2
+	  end
       
-         realFreqFtn.Aw[:] =  Aw
-      
-      
+          realFreqFtn.Aw[:] =  Aw
           auxiliary_inverse_temp_prev = deepcopy(auxiliary_inverse_temp)
-      
           Energy = get_total_energy( imagFreqFtn, realFreqFtn.Aw, kernel,numeric)
           ##=  comment:write
           if write_information
@@ -425,49 +356,8 @@
               information_file=open("$(workDirect)/information.out","a")
               write(information_file,"$auxiliary_inverse_temp\t\t$(Energy) ; $(iter)\t$(mixing)\t$(auxTempRenomalFactor)   \n" )
               close(information_file)   
-             write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw, fname_out,  "")
-             # comment:Reproduce
-              GreenFtn_rep = kernel.Kernel *  Aw ;
-              moments_rep  = kernel.moment *  Aw ;
-      
-              GreenFtn_rep *= imagFreqFtn.Normalization ;
-              for i = 1:NumSubOrbit
-                  for j=1:NumSubOrbit
-                  f=open( "$(workDirect)/reproduce_$(i+startOrbit)_$(j+startOrbit).out","w")
-                  for iw=1:numeric.N_Matsubara
-                      z = ((2.*iw-1)*pi/data_info.inverse_temp)im;
-                      ftn = GreenFtn_rep[iw][i,j] + imagFreqFtn.GreenConst[i,j] 
-                      write(f,"$(imag(z))  $(real(ftn))    $(imag(ftn))  \n" )
-                  end
-                  for iw=numeric.N_Matsubara+1:numeric.N_MatsubaraDATA
-                      z = ((2.*iw-1)*pi/data_info.inverse_temp)im;
-		      ftn =   moments_rep[1]/z +  moments_rep[2]/ z^2 + moments_rep[3] /z^3
-		      ftn += imagFreqFtn.GreenConst
-		      ftn = ftn[i,j]
-                      write(f,"$(imag(z))  $(real(ftn))    $(imag(ftn))  \n" )
-                  end
-                  close(f)
-                  end
-              end
-      
-#      
-#              f=open("$(workDirect)/cubic_coeff.out","w")
-#               temp = kernel.cubic_coeff_transf * Aw
-#               for w=1:numeric.Egrid-1
-#                 for subinex = 0:19
-#                  E = (20-subinex)/20 * numeric.ERealAxis[w] + subinex/20 * numeric.ERealAxis[w+1]
-#                  interpol_val =  temp[4*(w-1)+1][1,1]*(E-numeric.ERealAxis[w])^3 + 
-#                                  temp[4*(w-1)+2][1,1]*(E-numeric.ERealAxis[w])^2 + 
-#                                  temp[4*(w-1)+3][1,1]*(E-numeric.ERealAxis[w])^1 + 
-#                                  temp[4*(w-1)+4][1,1]*(E-numeric.ERealAxis[w])^0
-#                  
-#                  interpol_val = real(interpol_val)*imagFreqFtn.Normalization
-#                  write(f,"$(E) $(interpol_val)\n")  
-#                  end
-#               end
-#               close(f)
-          end #write_information
-          # =#
+              write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw, kernel, fname_out,  "")
+	   end
 
       end #while_ (auxiliary_inverse_temp  <=  end_temperature)
   
@@ -679,10 +569,10 @@
 
 
 
-  println(moments[1])
-  println(moments[2])
-  println(moments[3])
-  println(moments[4])
+#  println(moments[1])
+#  println(moments[2])
+#  println(moments[3])
+#  println(moments[4])
   
   
   
@@ -819,6 +709,69 @@
   #############################################################################################
   
   
+
+function smoothKernel(numeric::strNumeric, data_info::data_info_, dSegment)
+#   igamma = 2*pi/data_info.inverse_temp * im
+
+   num_seg_coeff = 2*(numeric.Egrid-1)
+
+   T = zeros(Float64, num_seg_coeff,  numeric.Egrid)
+   B = zeros(Float64, num_seg_coeff, num_seg_coeff)
+   Kernel_from_cubic= zeros(Complex128, numeric.Egrid, num_seg_coeff)
+
+
+   for j=1:numeric.Egrid-1
+     s = 2*(j-1)
+     T[s+1, j]   = 1.0
+     T[s+2, j+1] = 1.0
+   end
+
+   for j=1:numeric.Egrid-1
+       s = 2*(j-1)
+       B[s+1, s+2] = 1
+
+       B[s+2, s+1] = (dSegment[j])^1
+       B[s+2, s+2] = 1
+   end
+
+
+   f1(wj, w) = 1.0/2.0 *(w-wj)^2
+#   f1(wj, w) = 0.0
+   f2(wj, w) = w
+#   f3(iwn, wj, w ) =  -w   -(iwn-wj)   * log(-iwn + wj +w)
+#   f4(iwn, wj, w ) =       -             log(-iwn + wj +w)
+   for n=1:numeric.Egrid
+    for j=1:numeric.Egrid-1
+       s = 2*(j-1)
+#       wj = numeric.ERealAxis[j]  - numeric.ERealAxis[n]
+#       Kernel_from_cubic[n,2*(j-1)+1] = (f3(-igamma, wj, dSegment[j]) - f3(-igamma, wj, 0))  -  (f3(igamma, wj, dSegment[j]) - f3(igamma, wj, 0))
+#       Kernel_from_cubic[n,2*(j-1)+2] = (f4(-igamma, wj, dSegment[j]) - f4(-igamma, wj, 0))  -  (f4(igamma, wj, dSegment[j]) - f4(igamma, wj, 0))
+
+       En=numeric.ERealAxis[n]
+       Ej1=numeric.ERealAxis[j+1]
+       Ej=numeric.ERealAxis[j]
+
+       upper_cut = minimum([En+blur_width, Ej1])
+       lower_cut = maximum([En-blur_width, Ej])
+       if upper_cut > lower_cut
+         Kernel_from_cubic[n,s+1] =  f1(Ej, upper_cut) - f1(Ej,lower_cut)
+         Kernel_from_cubic[n,s+2] =  f2(Ej, upper_cut) - f2(Ej,lower_cut)
+       end
+    end
+   end
+#   Kernel_from_cubic /= (2*im*pi)
+   Kernel_from_cubic /= (2*blur_width)
+   SMOOTH=  (Kernel_from_cubic*  inv(B) * T)
+#   SMOOTH += SMOOTH'
+#   SMOOTH /= 2.0
+#   SMOOTH = Hermitian(SMOOTH)
+
+#   SMOOTH = eye(SMOOTH)
+   return SMOOTH
+end
+
+
+
   
   function construct_Kernel_inCubicSpline( numeric::strNumeric, data_info::data_info_ )
   
@@ -890,17 +843,10 @@
   
   
   
-  #   #boundary conditions:
-  #   B[s+3, 3] = 1    #S'(w1) = 0
-  #   #w_N * S'(w_N) = 0
-  #   B[s+4, s+1] = ERealAxis[j+1] *3*(dSegment[j])^2
-  #   B[s+4, s+2] = ERealAxis[j+1] *2*(dSegment[j])^1
-  #   B[s+4, s+3] = ERealAxis[j+1] *1
   
   
   
      #boundary conditions:
-
      #S''(w1) = 0
      B[s+3, 2] = 2    
      #S''(w_N) = 0
@@ -948,12 +894,6 @@
       Gamma3 -=      ((1/z^3)^2)
      end
 
-#     for iw = N_Matsubara:1e4*N_Matsubara
-#      z = ((2.*iw-1)*pi/data_info.inverse_temp);
-#      Gamma1 +=      ((1/z  )^2)
-#      Gamma2 +=      ((1/z^2)^2)
-#      Gamma3 +=      ((1/z^3)^2)
-#     end
      
      
      println("Gamma1:",Gamma1)
@@ -965,8 +905,6 @@
      kernel.gamma[2,2] = Gamma2 
      kernel.gamma[3,3] = Gamma3 
 
-#     kernel.gamma[4,4] = Gamma4
-#     kernel.gamma[5,5] = Gamma5 
 
      kernel.gamma[1,3] = Gamma2 
      kernel.gamma[3,1] = Gamma2 
@@ -978,15 +916,6 @@
 
      
      
-  #moment[j.:] Aw[:] = \int w^(j-1) A(w).,               
-  #A(w) \approx (Aw[l+1]-Aw[l])/dSegment[l]*(w-E[l])+Aw[l] 
-  #        =   Aw[l+1]*(w-E[l])/dSegment[l] - Aw[l]*[(w -E[l])/dSegment[l]-1];
-  #        =   Aw[l+1]*(w-E[l])/dSegment[l] - Aw[l]*[(w-{E[l]+dSegment[l]}]/dSegment[l];
-  #        =   Aw[l+1]*(w-E[l])/dSegment[l] - Aw[l]*[(w- E[l+1]]/dSegment[l];
-  
-
-
-# F(wj,w)=\int dw w^m*(w-wj)^l    ;gml(wj,dw) =  F(wj, wj+dw)
 
      g0a(wj, dw ) =  1./4. * dw^4
      g0b(wj, dw ) =  1./3. * dw^3
@@ -1029,7 +958,8 @@
      for l=1:numeric.Egrid
        for n=1:N_Matsubara
          iwn = ((2.*n-1)*pi/data_info.inverse_temp)im;
-         kernel.Kernel_dagger[l,n] = 1/(-iwn - numeric.ERealAxis[l] )
+#         kernel.Kernel_dagger[l,n] = 1/(-iwn - numeric.ERealAxis[l] )
+         kernel.Kernel_dagger[l,n] = -  ( log((iwn + numeric.ERealAxis[l] + blur_width)/(iwn + numeric.ERealAxis[l] - blur_width)) )/ (2*blur_width)
        end
      end
      for l=1:numeric.Egrid
@@ -1055,6 +985,9 @@
      kernel.partial = partial_from_cubic * inv(B) * T
   
   
+     kernel.smooth  = smoothKernel(numeric, data_info, dSegment)
+     kernel.Kernel  = kernel.Kernel *  kernel.smooth
+     kernel.moment  = kernel.moment * kernel.smooth
      return kernel
   end
   
