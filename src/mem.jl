@@ -39,12 +39,17 @@ function input_ftn(var::String, val)
 end
 ####################################################
 workDirect      =  input_ftn("workDirect", pwd())
-inputFile       =  input_ftn("inputFile")
-NumFullOrbit        = input_ftn("NumOrbit")
-num_of_subblock =  input_ftn("num_of_subblock", 1)
-start_cluster    = input_ftn("start_cluster",0)
-N_Matsubara2     = input_ftn("N_Matsubara")
-inverse_temp    = input_ftn("inverse_temp")
+inputFile       =  input_ftn("inputFile", "Sw_SOLVER.full.dat")
+inverse_temp        = input_ftn("inverse_temp"            )
+
+(Norb_file, NMat_file ) = find_default_parm( workDirect, inputFile, inverse_temp)
+
+
+
+NumFullOrbit        = input_ftn("NumOrbit",    Norb_file  )
+num_of_subblock     = input_ftn("num_of_subblock", 1      )
+start_cluster       = input_ftn("start_cluster"  , 0      )
+N_Matsubara2        = input_ftn("N_Matsubara", NMat_file  )
 Asymtotic_HighFreq  = input_ftn("Asymtotic_HighFreq", true)
 
 
@@ -58,13 +63,13 @@ data_info = data_info_(workDirect,
 		       inverse_temp,
 		       Asymtotic_HighFreq)
 
-EwinOuterRight  = input_ftn("EwinOuterRight", 10.0)
-EwinOuterLeft   = input_ftn("EwinOuterLeft" ,-10.0)
-EwinInnerRight  = input_ftn("EwinInnerRight" , 3.0)
-EwinInnerLeft   = input_ftn("EwinInnerLeft"  ,-3.0)
-coreWindow      = input_ftn("coreWindow"  , 0.0)
-coreDense       = input_ftn("coreDense"   , 2)
-EgridInner           = input_ftn("Egrid", 100)
+EwinOuterRight  = input_ftn("EwinOuterRight" , 20.0)
+EwinOuterLeft   = input_ftn("EwinOuterLeft"  ,-20.0)
+EwinInnerRight  = input_ftn("EwinInnerRight" , 10.0)
+EwinInnerLeft   = input_ftn("EwinInnerLeft"  ,-10.0)
+coreWindow      = input_ftn("coreWindow"     , 5.0)
+coreDense       = input_ftn("coreDense"      , 2)
+EgridInner           = input_ftn("Egrid"     , 100)
 
 real_freq_grid_info= real_freq_grid_info_(EwinOuterRight,
 					   EwinOuterLeft,
@@ -75,11 +80,11 @@ real_freq_grid_info= real_freq_grid_info_(EwinOuterRight,
 					   EgridInner
 					   )
 
-default_model  = input_ftn("default_model" ,"g_mat")
+default_model  = input_ftn("default_model" ,"f")
 Model_range_right = input_ftn("Model_right",EwinOuterRight)
 Model_range_left  = input_ftn("Model_left" ,EwinOuterLeft)
-auxiliary_inverse_temp_range = input_ftn("auxiliary_inverse_temp_range")
-auxTempRenomalFactorInitial  = input_ftn("auxTempRenomalFactorInitial", 0.01)
+auxiliary_inverse_temp_range = input_ftn("auxiliary_inverse_temp_range", [1e-2, 1.0] )
+auxTempRenomalFactorInitial  = input_ftn("auxTempRenomalFactorInitial" , 1.1)
 
 mem_fit_parm= mem_fit_parm_(default_model,
 			    Model_range_right,
@@ -90,13 +95,13 @@ mem_fit_parm= mem_fit_parm_(default_model,
 
 
 
-NumIter              = input_ftn("NumIter",       10000)
-mixingInitial        = input_ftn("mixingInitial", 0.1)
-mixing_max           = input_ftn("mixing_max", 0.3)
-mixing_min           = input_ftn("mixing_min", 1e-6)
-pulay_mixing_start   = input_ftn("pulay_mixing_start", 100)
-pulay_mixing_step    = input_ftn("pulay_mixing_step", 1)
-pulay_mixing_history = input_ftn("pulay_mixing_history", 1)
+NumIter              = input_ftn("NumIter",              10000)
+mixingInitial        = input_ftn("mixingInitial",        0.1)
+mixing_max           = input_ftn("mixing_max",           0.3)
+mixing_min           = input_ftn("mixing_min",           1e-6)
+pulay_mixing_start   = input_ftn("pulay_mixing_start",   1)
+pulay_mixing_step    = input_ftn("pulay_mixing_step",    1)
+pulay_mixing_history = input_ftn("pulay_mixing_history", 5)
 
 mixing_parm= mixing_parm_(NumIter,
 			   mixingInitial,
@@ -200,7 +205,7 @@ for cluster=start_cluster:num_of_subblock-1
     global fname_reproduce = Array{String}(phyParm.NumSubOrbit,phyParm.NumSubOrbit)
     for i = 0:phyParm.NumSubOrbit-1
         for j=0:phyParm.NumSubOrbit-1
-            fname_out[i+1,j+1] = "$(workDirect)/Density_of_state_$(i+startOrbit)_$(j+startOrbit).dat"
+            fname_out[i+1,j+1] = "$(workDirect)/spectral_function_$(i+startOrbit)_$(j+startOrbit).dat"
       fname_reproduce[i+1,j+1] = "$(workDirect)/reproduce_$(i+startOrbit)_$(j+startOrbit).out"
       fname_contniuedSpectrum[i+1,j+1] = "$(workDirect)/realFreq_Sw.dat_$(i+startOrbit+1)_$(j+startOrbit+1)"
         end
@@ -261,7 +266,7 @@ for cluster=start_cluster:num_of_subblock-1
  # #=
  #  #= get aux. temperature spectrum
    realFreqFtn.Aw = deepcopy(realFreqFtn.Spectral_default_model)
-   (logEnergy, logAlpha) = mem_annealing( kernel,  realFreqFtn, imagFreqFtn,  numeric, mem_fit_parm, mixing_parm, true, fname_out, data_info, startOrbit)
+   (logEnergy, logAlpha) = search_alpha( kernel,  realFreqFtn, imagFreqFtn,  numeric, mem_fit_parm, mixing_parm, true, fname_out, data_info, startOrbit)
  #  =#
  toc()
  
@@ -277,8 +282,6 @@ for cluster=start_cluster:num_of_subblock-1
    p0=[ 1 , mean(logAlpha), (logAlpha[end] -logAlpha[1])/2 , mean(logEnergy)  ]
    fit = curve_fit( hyp_tan_model, logAlpha,  logEnergy,  p0  )
    p= fit.param
-
- #  alpha_optimal =  exp(p[3] *log((1+sqrt(5))/2) + p[2])   #second derivative of tanh(x) has maximum at log((1+sqrt(5))/2)
    alpha_optimal =  exp( 1.5 *p[3] + p[2])
    println("fitted logE(loga): -$(p[1])*tanh((x-($(p[2])))/$(p[3])) + $(p[4])")
 
@@ -288,7 +291,7 @@ for cluster=start_cluster:num_of_subblock-1
    else
       mem_fit_parm.auxiliary_inverse_temp_range[2] = alpha_optimal
       realFreqFtn.Aw = deepcopy(realFreqFtn.Spectral_default_model)
-      (logEnergy, logAlpha) = mem_annealing( kernel,  realFreqFtn, imagFreqFtn,numeric,   mem_fit_parm, mixing_parm, false, fname_out, data_info, startOrbit)
+      (logEnergy, logAlpha) = search_alpha( kernel,  realFreqFtn, imagFreqFtn,numeric,   mem_fit_parm, mixing_parm, false, fname_out, data_info, startOrbit)
    end
    energy_optimal = get_total_energy( imagFreqFtn, realFreqFtn.Aw, kernel,numeric);
    energy_tail_optimal = get_total_energy_for_tail( imagFreqFtn, realFreqFtn.Aw, kernel,numeric);

@@ -5,56 +5,47 @@
 # (start) define Ftns
 #############################################################################################
 
-#include("mem_variable.jl")
-#include("mem_gaussianPot.jl")
-
-
-
-
-
-
+using LsqFit
 global blur_width = 0.5;
-  function get_total_energy_for_tail(imagFreqFtn ,Aw::Array{Array{Complex128,2}}, kernel, numeric)
-          NumSubOrbit        = size(Aw[1])[1]
-          moments =  kernel.moment * Aw
-          temp = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3] - moments
-	  Energy_tail=0;
-	  for mom = 1:3
-		  Energy_tail +=  kernel.gamma[mom,mom]* vecnorm( temp[mom])^2
-	  end
-	  Energy_tail +=  2*kernel.gamma[1,3]* real(trace(temp[1]'*temp[3]))
-  
-	  return real(Energy_tail)
-  end
+
+function get_total_energy_for_tail(imagFreqFtn ,Aw::Array{Array{Complex128,2}}, kernel, numeric)
+        NumSubOrbit        = size(Aw[1])[1]
+        moments =  kernel.moment * Aw
+        temp = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3] - moments
+        Energy_tail=0;
+        for mom = 1:3
+      	  Energy_tail +=  kernel.gamma[mom,mom]* vecnorm( temp[mom])^2
+        end
+        Energy_tail +=  2*kernel.gamma[1,3]* real(trace(temp[1]'*temp[3]))
+
+        return real(Energy_tail)
+end
 
 
 
-  function get_total_energy(imagFreqFtn ,Aw::Array{Array{Complex128,2}}, kernel, numeric)
-          NumSubOrbit        = size(Aw[1])[1]
-          Energy=0
-          EnergyMatrix=zeros(Complex128, NumSubOrbit, NumSubOrbit)
-          for n=1:numeric.N_Matsubara
-             GreenReproduced=zeros(Complex128, NumSubOrbit, NumSubOrbit)
-             for w=1:numeric.Egrid
-                GreenReproduced += (kernel.Kernel[n,w]*Aw[w])
-             end
-             EnergyMatrix = (imagFreqFtn.GreenFtn[n] - GreenReproduced)
-             Energy    +=    (vecnorm(EnergyMatrix)^2)
-          end
-
-          moments =  kernel.moment * Aw
-          temp = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3 ] - moments
-	  Energy_tail=0;
-	  for mom = 1:3
-		  Energy_tail +=  kernel.gamma[mom,mom]* vecnorm( temp[mom])^2
+function get_total_energy(imagFreqFtn ,Aw::Array{Array{Complex128,2}}, kernel, numeric)
+        NumSubOrbit        = size(Aw[1])[1]
+        Energy=0
+        EnergyMatrix=zeros(Complex128, NumSubOrbit, NumSubOrbit)
+        for n=1:numeric.N_Matsubara
+           GreenReproduced=zeros(Complex128, NumSubOrbit, NumSubOrbit)
+           for w=1:numeric.Egrid
+              GreenReproduced += (kernel.Kernel[n,w]*Aw[w])
            end
-	  Energy_tail +=  2*kernel.gamma[1,3]* real(trace(temp[1]'*temp[3]))
+           EnergyMatrix = (imagFreqFtn.GreenFtn[n] - GreenReproduced)
+           Energy    +=    (vecnorm(EnergyMatrix)^2)
+        end
 
-#          Energy_tail =  real(trace(copy(temp') * kernel.gamma * temp))
-          Energy  += Energy_tail
-  
-	  return real(Energy)
-  end
+        moments =  kernel.moment * Aw
+        temp = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3 ] - moments
+        Energy_tail=0;
+        for mom = 1:3
+      	  Energy_tail +=  kernel.gamma[mom,mom]* vecnorm( temp[mom])^2
+         end
+        Energy_tail +=  2*kernel.gamma[1,3]* real(trace(temp[1]'*temp[3]))
+        Energy  += Energy_tail
+        return real(Energy)
+end
   
   
   
@@ -289,13 +280,12 @@ global blur_width = 0.5;
   
   
   
-  function  mem_annealing( kernel::strKernel,  realFreqFtn::strRealFreqFtn, imagFreqFtn::strImagFreqFtn, numeric::strNumeric,   mem_fit_parm::mem_fit_parm_, mixing_parm::mixing_parm_, write_information::Bool, fname_out, data_info::data_info_, startOrbit::Int64)
+  function  search_alpha( kernel::strKernel,  realFreqFtn::strRealFreqFtn, imagFreqFtn::strImagFreqFtn, numeric::strNumeric,   mem_fit_parm::mem_fit_parm_, mixing_parm::mixing_parm_, write_information::Bool, fname_out, data_info::data_info_, startOrbit::Int64)
   
       start_temperature = mem_fit_parm.auxiliary_inverse_temp_range[1]
       end_temperature =   mem_fit_parm.auxiliary_inverse_temp_range[2]
       logEnergy =  Array{Float64}(0)
       logAlpha  =  Array{Float64}(0)
-      alpha_list = Array{Float64}(0)
       mixing =  0.0::Float64
       Aw = deepcopy(realFreqFtn.Aw)
       Aw_SVD = deepcopy(realFreqFtn.Aw)
@@ -316,7 +306,11 @@ global blur_width = 0.5;
       mixingPrev = deepcopy(mixing)
       mixingNext =  deepcopy(mixing)
       iter=0;
-      while  auxiliary_inverse_temp  <=  end_temperature
+
+      print_stdout= 10
+      integrated_chi2_alpha_prev=0.0
+
+      while  true
           mixing = mixingNext
           auxTempRenomalFactor = min(1+ ((auxTempRenomalFactor-1)*1.01)   , 1.5*mem_fit_parm.auxTempRenomalFactorInitial)
           auxiliary_inverse_temp *= auxTempRenomalFactor;  
@@ -337,30 +331,69 @@ global blur_width = 0.5;
                     Aw_Iteration(realFreqFtn, imagFreqFtn,kernel, auxiliary_inverse_temp, NumSubOrbit, numeric,mixing, mixing_parm)
             if trial==10 break end
           end
-          if trial==10 break end
-	  print_stdout=2
-	  if converg &&   (auxiliary_inverse_temp - start_temperature)/(end_temperature-start_temperature) *100 > print_stdout
-		  println("Auxiliary_inverse_temp (alpha_inv): $(auxiliary_inverse_temp)")
-		  print_stdout += 2
+          if trial==10 
+	     println("WARNNIG: spectral function is not converged!")
+	     break 
 	  end
-      
+
           realFreqFtn.Aw[:] =  Aw
           auxiliary_inverse_temp_prev = deepcopy(auxiliary_inverse_temp)
+
+          ##=  comment:write results
           Energy = get_total_energy( imagFreqFtn, realFreqFtn.Aw, kernel,numeric)
-          ##=  comment:write
+          push!(logEnergy, log(Energy))
+          push!(logAlpha, log(auxiliary_inverse_temp))
+
+	  progress = (auxiliary_inverse_temp - start_temperature)/(end_temperature-start_temperature) *100 
+	  if converg &&  progress > print_stdout
+                 #  #= Find optimal alpha
+                   function hyp_tan_model(x,p)
+                    return  -p[1] * tanh.((x-p[2])/p[3]) + p[4]   #note : -tanh(x) = -2/(e^(2x) +1 ) -1,    p[3]= 2*temperature in FD distribution
+                   end
+                   p0=[ 1 , mean(logAlpha), (logAlpha[end] -logAlpha[1])/2 , mean(logEnergy)  ]
+                   fit = curve_fit( hyp_tan_model, logAlpha,  logEnergy,  p0  )
+                   p= fit.param
+                   alpha_optimal =  exp( 1.5 *p[3] + p[2])
+		   #
+
+
+
+
+		   tempE   = deepcopy(logEnergy)
+		   tempAlp = deepcopy(logAlpha)
+		   a = (logEnergy[end]-logEnergy[1])/(logAlpha[end]-logAlpha[1]) 
+		   b = -a*logAlpha[1] +logEnergy[1]
+		   for l=1:length(logEnergy)
+		     tempE[l] = tempE[l] - (a*tempAlp[l]+b)
+		   end
+		   integrated_chi2_alpha = sum(tempE)
+
+	           @printf("%.1f \t alpha_inv: %.5f\t\t estimated_alpha_inv_opt: %.5f, and log:%.5f\n ",
+		   progress, auxiliary_inverse_temp, alpha_optimal, log(alpha_optimal))
+
+
+#		   if(progress >= 98 &&  alpha_optimal > auxiliary_inverse_temp)
+		   if(progress >= 98 &&  integrated_chi2_alpha > integrated_chi2_alpha_prev )
+          		   end_temperature *= 2
+		   end
+		   print_stdout += 2
+	  end
+      
           if write_information
-              push!(logEnergy, log(Energy))
-              push!(logAlpha, log(auxiliary_inverse_temp))
-              push!(alpha_list, auxiliary_inverse_temp)
-          
               information_file=open("$(workDirect)/information.out","a")
               write(information_file,"$auxiliary_inverse_temp\t\t$(Energy) ; $(iter)\t$(mixing)\t$(auxTempRenomalFactor)   \n" )
               close(information_file)   
+	      s= @sprintf "%.5f" auxiliary_inverse_temp
+              write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw, kernel, fname_out,  "at_alpha_inv_$(s)")
               write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw, kernel, fname_out,  "")
 	   end
 
+      if  auxiliary_inverse_temp  >  end_temperature
+           break
+      end
       end #while_ (auxiliary_inverse_temp  <=  end_temperature)
   
+#      return  logEnergy,  logAlpha, end_temperature
       return  logEnergy,  logAlpha
   end
   
@@ -450,224 +483,187 @@ global blur_width = 0.5;
      push!(dERealAxis, (ERealAxis[i+1] - ERealAxis[i-1])/2 )
   end
   push!(dERealAxis,  (ERealAxis[Egrid] - ERealAxis[Egrid-1])/2)
-  
-  
   return ERealAxis, dERealAxis, Egrid;
   end
   
+function find_default_parm(workDirect, inputFile, inverse_temp  )
+    fname = "$(workDirect)/$(inputFile)"
+    Giw_raw = readdlm(fname);
+    w_index = convert(Array{Int64,1},Giw_raw[:,1]);
+    orb_index=convert(Array{Int64,1},Giw_raw[:,2]);
+    NMat_file = maximum(w_index)+1
+    Norb_file  =maximum(orb_index)+1
+
+    return Norb_file, NMat_file
+     
+end
   
   
   function read_matsubara_GreenFtn!( data_info::data_info_, numeric::strNumeric, startOrbit::Int64, NumSubOrbit::Int64)
-  N_Matsubara = numeric.N_MatsubaraDATA
-  fname = "$(data_info.workDirect)/$(data_info.inputFile)"
-  inverse_temp = data_info.inverse_temp
-  NumFullOrbit = data_info.NumFullOrbit
-  
-  GreenFtn = Array{Array{Complex128,2}}(N_Matsubara)
-  GreenConstFull =  zeros(Complex128, NumFullOrbit,NumFullOrbit)
-  for jj = 1:size(GreenFtn)[1]
-    GreenFtn[jj]= zeros(Complex128, NumSubOrbit,NumSubOrbit)
-  end
-  
-  #=
-  #Read Matsubara Green's Ftn
-  =#
-  #A = readdlm(fname,' ');
-  #A = readdlm(fname,',');
-  A = readdlm(fname);
-  
-  B=convert(Array{Int64,2},A[:,1:3]);
-  C = A[:,4:end];
-  A = [];
-  iw=0;
-  iwmax=0;
-  
-  
-  for jj = 1:size(B)[1]
-      iw=B[jj,1];
-       i=B[jj,2]+1;
-       j=B[jj,3]+1;
-      if startOrbit<i<=NumSubOrbit+startOrbit && startOrbit<j<=NumSubOrbit+startOrbit
-          isub= i-startOrbit
-          jsub= j-startOrbit
-          if  0<=iw<N_Matsubara
-              GreenFtn[iw+1][isub,jsub]=C[jj,1]+C[jj,2]im
+      N_Matsubara = numeric.N_MatsubaraDATA
+      fname = "$(data_info.workDirect)/$(data_info.inputFile)"
+      inverse_temp = data_info.inverse_temp
+      NumFullOrbit = data_info.NumFullOrbit
+      
+      GreenFtn = Array{Array{Complex128,2}}(N_Matsubara)
+      GreenConstFull =  zeros(Complex128, NumFullOrbit,NumFullOrbit)
+      for jj = 1:size(GreenFtn)[1]
+        GreenFtn[jj]= zeros(Complex128, NumSubOrbit,NumSubOrbit)
+      end
+      
+      #=
+      #Read Matsubara Green's Ftn
+      =#
+      A = readdlm(fname);
+      
+      B=convert(Array{Int64,2},A[:,1:3]);
+      C = A[:,4:end];
+      A = [];
+      iw=0;
+      iwmax=0;
+      
+      
+      for jj = 1:size(B)[1]
+          iw=B[jj,1];
+           i=B[jj,2]+1;
+           j=B[jj,3]+1;
+          if startOrbit<i<=NumSubOrbit+startOrbit && startOrbit<j<=NumSubOrbit+startOrbit
+              isub= i-startOrbit
+              jsub= j-startOrbit
+              if  0<=iw<N_Matsubara
+                  GreenFtn[iw+1][isub,jsub]=C[jj,1]+C[jj,2]im
+             end
+          end
+          if  iw>=N_Matsubara-5 && i<=NumFullOrbit && j<=NumFullOrbit
+               GreenConstFull[i,j] += C[jj,1]+C[jj,2]im
+          end
+          if iwmax < iw
+                  iwmax = iw
+          end
+      end #file lines
+      
+      GreenConstFull = GreenConstFull/5.0
+      
+      if(iwmax+1!=N_Matsubara)
+              println("Please check N_Matsubara, $(iwmax+1) != $(N_Matsubara)")
+      end
+      
+      
+      #find moments
+      NumMom=4
+      moments    = Array{Array{Complex128,2}}(4)
+      momentstrace = Array{Array{Float64}}(4)
+      momentstest  = Array{Array{Array{Complex128,2}}}(4)
+      momentstrace[1] = []
+      momentstrace[2] = []
+      momentstrace[3] = []
+      momentstrace[4] = []
+      momentstest[1] = []
+      momentstest[2] = []
+      momentstest[3] = []
+      momentstest[4] = []
+
+      w_Asymto_start=1
+      w_Asymto_end=N_Matsubara-10
+      w_Asymto_range = w_Asymto_end - w_Asymto_start +1
+      for w_Asymto = w_Asymto_start:w_Asymto_end
+        ASlen = N_Matsubara-w_Asymto+1   # num of Mat. freq. in the asymtotic region 
+        KM =  zeros(Float64,ASlen*2,NumMom)
+        Gasym =  Array{Array{Complex128,2}}(ASlen*2)
+        for jj = 1:ASlen
+            wn = (w_Asymto-1)+jj
+            z = ((2.*wn-1)*pi/inverse_temp);
+            KM[2*jj-1,1] =   1.0        #const ,
+            KM[2*jj,  2] =  -1/z        #norm  , >0
+            KM[2*jj-1,3] =  -1/z^2      #<w>
+            KM[2*jj,  4] =   1/z^3      #<w^2> , >0
+        
+            Gasym[2*jj-1] = Hermitian((GreenFtn[wn] + GreenFtn[wn]')/2);
+            Gasym[2*jj  ] = Hermitian((GreenFtn[wn] - GreenFtn[wn]')/(2im));
+
+        end
+        KMsvdf = svdfact(KM, thin=false)
+        moments = (  ((KMsvdf[:Vt]')[:,1:NumMom]  * diagm(1./ KMsvdf[:S]) * (KMsvdf[:U]')[1:NumMom,:])   * Gasym   )
+        push!(momentstest[1], Hermitian(moments[1]))   #const
+        push!(momentstest[2], Hermitian(moments[2]))   #norm
+        push!(momentstest[3], Hermitian(moments[3]))   #<w>
+        push!(momentstest[4], Hermitian(moments[4]))   #<w^2>
+
+        push!(momentstrace[1] ,  trace(momentstest[1][end]))  #const
+        push!(momentstrace[2] ,  trace(momentstest[2][end]))  #norm
+        push!(momentstrace[3] ,  trace(momentstest[3][end]))  #<w>
+        push!(momentstrace[4] ,  trace(momentstest[4][end]))  #<w^2>
+      end
+
+      Nv =  div(N_Matsubara ,20) #why 20?
+      for mom=1:4
+         var_j=[]
+         for j = Nv+1:w_Asymto_range-Nv
+                 push!(var_j , var(momentstrace[mom][j-Nv:j+Nv])  )
          end
+         j0 = indmin(var_j) + Nv
+         moments[mom] =  mean(momentstest[mom][j0-Nv:j0+Nv])
       end
-      if  iw>=N_Matsubara-5 && i<=NumFullOrbit && j<=NumFullOrbit
-           GreenConstFull[i,j] += C[jj,1]+C[jj,2]im
+
+
+
+      println("const   :  ",      real(trace(moments[1])))
+      println("1/(iw)  :  ",      real(trace(moments[2])))
+      println("1/(iw)^2:  ",      real(trace(moments[3])))
+      println("1/(iw)^3:  ",     (real(trace(moments[4]))))
+      
+      N = real(trace(moments[2]))
+      c = real(trace(moments[3]))/N
+      s = real(trace(moments[4]))/N
+      
+      s= (s-c^2)
+      println("center  :", c)
+      println("variance:", s)
+      
+      
+      
+      #set N_Matsubara for low freq. 
+      if N_Matsubara > 500  &&  data_info.Asymtotic_HighFreq
+        temp=[]
+        for w = 1:N_Matsubara
+            z = ((2.*w-1)*pi/inverse_temp)im;
+            push!(temp,
+            (norm( GreenFtn[w]  - (moments[1] + moments[2]/z + moments[3]/(z^2) + moments[4]/(z^3) ))    )/(norm(GreenFtn[w]))
+            )
+        end
+        numeric.N_Matsubara = indmin(temp)
+
+        println("Asymto iwn = $((2*numeric.N_Matsubara-1)*pi/inverse_temp) at n=$(numeric.N_Matsubara)")
+        GreenFtn = GreenFtn[1:numeric.N_Matsubara]
+      else
+        numeric.N_Matsubara = N_Matsubara
       end
-      if iwmax < iw
-              iwmax = iw
+
+      #Renomalize...
+      Normalization = real(trace(moments[2]))
+      println("Normalization:$Normalization")
+      println("read Giw[1]   : $(-real((moments[2][1,1])))/x +$(real((moments[4][1,1])))/x**3")
+      println("read Giw_trace: $(-real(trace(moments[2])))/x +$(real(trace(moments[4])))/x**3")
+      
+      for iw = 1:numeric.N_Matsubara
+              z = ((2.*iw-1)*pi/inverse_temp)im;
+              GreenFtn[iw] -= moments[1]
+              GreenFtn[iw] /= Normalization
       end
-  end #file lines
-  
-  GreenConstFull = GreenConstFull/5.0
-  
-  if(iwmax+1!=N_Matsubara)
-	  println("Please check N_Matsubara, $(iwmax+1) != $(N_Matsubara)")
-  end
-  
-  
-  #find moments
-  
-  NumMom=4
-  moments    = Array{Array{Complex128,2}}(4)
-  momentstrace = Array{Array{Float64}}(4)
-  momentstest  = Array{Array{Array{Complex128,2}}}(4)
-  momentstrace[1] = []
-  momentstrace[2] = []
-  momentstrace[3] = []
-  momentstrace[4] = []
-  momentstest[1] = []
-  momentstest[2] = []
-  momentstest[3] = []
-  momentstest[4] = []
-
-  w_Asymto_start=1
-  w_Asymto_end=N_Matsubara-10
-  w_Asymto_range = w_Asymto_end - w_Asymto_start +1
-  for w_Asymto = w_Asymto_start:w_Asymto_end
-    ASlen = N_Matsubara-w_Asymto+1   # num of Mat. freq. in the asymtotic region 
-    KM =  zeros(Float64,ASlen*2,NumMom)
-    Gasym =  Array{Array{Complex128,2}}(ASlen*2)
-    for jj = 1:ASlen
-	wn = (w_Asymto-1)+jj
-	z = ((2.*wn-1)*pi/inverse_temp);
-	KM[2*jj-1,1] =   1.0        #const ,
-	KM[2*jj,  2] =  -1/z        #norm  , >0
-	KM[2*jj-1,3] =  -1/z^2      #<w>
-	KM[2*jj,  4] =   1/z^3      #<w^2> , >0
-    
-	Gasym[2*jj-1] = Hermitian((GreenFtn[wn] + GreenFtn[wn]')/2);
-	Gasym[2*jj  ] = Hermitian((GreenFtn[wn] - GreenFtn[wn]')/(2im));
-
-    end
-    KMsvdf = svdfact(KM, thin=false)
-    moments = (  ((KMsvdf[:Vt]')[:,1:NumMom]  * diagm(1./ KMsvdf[:S]) * (KMsvdf[:U]')[1:NumMom,:])   * Gasym   )
-    push!(momentstest[1], Hermitian(moments[1]))   #const
-    push!(momentstest[2], Hermitian(moments[2]))   #norm
-    push!(momentstest[3], Hermitian(moments[3]))   #<w>
-    push!(momentstest[4], Hermitian(moments[4]))   #<w^2>
-
-    push!(momentstrace[1] ,  trace(momentstest[1][end]))  #const
-    push!(momentstrace[2] ,  trace(momentstest[2][end]))  #norm
-    push!(momentstrace[3] ,  trace(momentstest[3][end]))  #<w>
-    push!(momentstrace[4] ,  trace(momentstest[4][end]))  #<w^2>
-  end
-
-  Nv =  div(N_Matsubara ,20) #why 20?
-  for mom=1:4
-     var_j=[]
-     for j = Nv+1:w_Asymto_range-Nv
-	     push!(var_j , var(momentstrace[mom][j-Nv:j+Nv])  )
-     end
-     j0 = indmin(var_j) + Nv
-     moments[mom] =  mean(momentstest[mom][j0-Nv:j0+Nv])
-  end
-
-
-
-
-#  println(moments[1])
-#  println(moments[2])
-#  println(moments[3])
-#  println(moments[4])
-  
-  
-  
-  
-  println("const   :  ",      real(trace(moments[1])))
-  println("1/(iw)  :  ",      real(trace(moments[2])))
-  println("1/(iw)^2:  ",      real(trace(moments[3])))
-  println("1/(iw)^3:  ",     (real(trace(moments[4]))))
-  
-  N = real(trace(moments[2]))
-  c = real(trace(moments[3]))/N
-  s = real(trace(moments[4]))/N
-  
-  s= (s-c^2)
-  println("center  :", c)
-  println("variance:", s)
-  
-  
-  
-  #set N_Matsubara for low freq. 
-  if N_Matsubara > 500  &&  data_info.Asymtotic_HighFreq
-    temp=[]
-    for w = 1:N_Matsubara
-        z = ((2.*w-1)*pi/inverse_temp)im;
-        push!(temp,
-        (norm( GreenFtn[w]  - (moments[1] + moments[2]/z + moments[3]/(z^2) + moments[4]/(z^3) ))    )/(norm(GreenFtn[w]))
-        )
-    end
-    numeric.N_Matsubara = indmin(temp)
-
-    println("Asymto iwn = $((2*numeric.N_Matsubara-1)*pi/inverse_temp) at n=$(numeric.N_Matsubara)")
-    GreenFtn = GreenFtn[1:numeric.N_Matsubara]
-  else
-    numeric.N_Matsubara = N_Matsubara
-  end
-  
-  
-  
-  #Best unitary transformation
-#  global bestUnitary= eye(NumSubOrbit);
-  #if basisTransform
-  #  eigValue, eigVect = eig(Hermitian(moments[2]));
-  #  bestUnitary = deepcopy(eigVect)
-  #end
-  
-  #for iw = 1:numeric.N_Matsubara
-  # GreenFtn[iw] = copy(bestUnitary') *  GreenFtn[iw] * bestUnitary
-  #end
-  #moments = [ copy(bestUnitary')* moments[j] *bestUnitary for j=1:length(moments)]
-  
-  
-  #if !(offDiagonal)
-  #     for iw = 1:numeric.N_Matsubara
-  #     GreenFtn[iw] = diagm(diag(GreenFtn[iw]))
-  #     end
-  #     moments = [diagm(diag(moments[j])) for j=1:length(moments)]
-  #end
-#  moments = [ (moments[j] + moments[j]')/2 for j=1:length(moments)]
-  
-  
-  
-  #Renomalize...
-  Normalization = real(trace(moments[2]))
-  println("Normalization:$Normalization")
-  println("read Giw[1]   : $(-real((moments[2][1,1])))/x +$(real((moments[4][1,1])))/x**3")
-  println("read Giw_trace: $(-real(trace(moments[2])))/x +$(real(trace(moments[4])))/x**3")
-  
-  for iw = 1:numeric.N_Matsubara
-          z = ((2.*iw-1)*pi/inverse_temp)im;
-          GreenFtn[iw] -= moments[1]
-          GreenFtn[iw] /= Normalization
-  #        if inversion_method
-  #             GreenFtn[iw] =  inv(z*eye(GreenFtn[iw]) - GreenFtn[iw]) 
-  #             GreenFtn[iw] /= trace(eye(GreenFtn[iw]))
-  #        end
-  end
-  
-  #println("<1>  :",Hermitian(moments[2])/Normalization)
-  #println("<w>  :",Hermitian(moments[3])/Normalization)
-  #println("<w^2>:",Hermitian(moments[4])/Normalization)
-  #println("<stddev>:", eig(Hermitian(moments[4])/Normalization - (Hermitian(moments[3])/Normalization)^2)[1])
-  
-  temp=strImagFreqFtn(
-       GreenFtn
-      ,GreenConstFull
-      ,Hermitian(moments[1])
-      ,Normalization
-      ,Hermitian(moments[2])/Normalization
-      ,Hermitian(moments[3])/Normalization
-      ,Hermitian(moments[4])/Normalization
-      ,zeros(moments[1])
-      ,zeros(moments[1])
-  )
-  
-  return temp 
+      
+      
+      temp=strImagFreqFtn(
+           GreenFtn
+          ,GreenConstFull
+          ,Hermitian(moments[1])
+          ,Normalization
+          ,Hermitian(moments[2])/Normalization
+          ,Hermitian(moments[3])/Normalization
+          ,Hermitian(moments[4])/Normalization
+          ,zeros(moments[1])
+          ,zeros(moments[1])
+      )
+      return temp 
   end
   
   
@@ -964,7 +960,8 @@ end
      end
      for l=1:numeric.Egrid
       for mom=1:3
-	      kernel.moment_dagger[l  ,mom] =  numeric.ERealAxis[l]^(mom-1)
+	      kernel.moment_dagger[l  ,mom] =  1/mom * ( (numeric.ERealAxis[l]+blur_width)^mom -
+	                                                 (numeric.ERealAxis[l]-blur_width)^mom )/(2*blur_width)
       end
      end
 
