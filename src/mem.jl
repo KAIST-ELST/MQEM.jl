@@ -18,7 +18,9 @@ using MQEM
 
 
 #input  param
-input_toml = TOML.parsefile(ARGS[1])
+
+run(`touch mqem.input.toml`)
+input_toml = TOML.parsefile("mqem.input.toml")
 function input_ftn(var::String)
   if haskey(input_toml, var) 
      println("Input : $(var):",input_toml[var] )
@@ -37,10 +39,24 @@ function input_ftn(var::String, val)
     return val
   end
 end
+function input_extern(var::String, extern_file::String)
+  extern_read = readdlm(extern_file)
+  for line =1:size(extern_read)[1]
+    if extern_read[line,1] == var
+      println("Input : $(var):", extern_read[line,3] )
+      return extern_read[line,3]
+    end
+  end
+  println("Input error: ",var )
+  exit()
+end
 ####################################################
-workDirect      =  input_ftn("workDirect", pwd())
-inputFile       =  input_ftn("inputFile", "Sw_SOLVER.full.dat")
-inverse_temp        = input_ftn("inverse_temp"            )
+workDirect      =     input_ftn("workDirect", pwd())
+inputFile       =     input_ftn("inputFile", "Sw_SOLVER.full.dat")
+inverse_temp        = input_ftn("inverse_temp" ,-1.0            )
+if inverse_temp <0
+inverse_temp =input_extern("BETA", "../../input.solver")
+end
 
 (Norb_file, NMat_file ) = find_default_parm( workDirect, inputFile, inverse_temp)
 
@@ -95,10 +111,10 @@ mem_fit_parm= mem_fit_parm_(default_model,
 
 
 
-NumIter              = input_ftn("NumIter",              10000)
+NumIter              = input_ftn("NumIter",              1000)
 mixingInitial        = input_ftn("mixingInitial",        0.1)
 mixing_max           = input_ftn("mixing_max",           0.3)
-mixing_min           = input_ftn("mixing_min",           1e-6)
+mixing_min           = input_ftn("mixing_min",           1e-4)
 pulay_mixing_start   = input_ftn("pulay_mixing_start",   1)
 pulay_mixing_step    = input_ftn("pulay_mixing_step",    1)
 pulay_mixing_history = input_ftn("pulay_mixing_history", 5)
@@ -274,32 +290,32 @@ for cluster=start_cluster:num_of_subblock-1
 
 
 
- tic()
- #  #= Find optimal alpha
-   function hyp_tan_model(x,p)
-    return  -p[1] * tanh.((x-p[2])/p[3]) + p[4]   #note : -tanh(x) = -2/(e^(2x) +1 ) -1,    p[3]= 2*temperature in FD distribution
-   end
-   p0=[ 1 , mean(logAlpha), (logAlpha[end] -logAlpha[1])/2 , mean(logEnergy)  ]
-   fit = curve_fit( hyp_tan_model, logAlpha,  logEnergy,  p0  )
-   p= fit.param
-   alpha_optimal =  exp( 1.5 *p[3] + p[2])
-   println("fitted logE(loga): -$(p[1])*tanh((x-($(p[2])))/$(p[3])) + $(p[4])")
-
-
- #  #= find optimal spectrum
-   if alpha_optimal > mem_fit_parm.auxiliary_inverse_temp_range[2]   alpha_optimal=deepcopy(mem_fit_parm.auxiliary_inverse_temp_range[2]) 
-   else
-      mem_fit_parm.auxiliary_inverse_temp_range[2] = alpha_optimal
-      realFreqFtn.Aw = deepcopy(realFreqFtn.Spectral_default_model)
-      (logEnergy, logAlpha) = search_alpha( kernel,  realFreqFtn, imagFreqFtn,numeric,   mem_fit_parm, mixing_parm, false, fname_out, data_info, startOrbit)
-   end
-   energy_optimal = get_total_energy( imagFreqFtn, realFreqFtn.Aw, kernel,numeric);
-   energy_tail_optimal = get_total_energy_for_tail( imagFreqFtn, realFreqFtn.Aw, kernel,numeric);
-   println("optimal alpha: $(alpha_optimal),  log: $(log(alpha_optimal))")
-   println("Total_energy_at_optimal_alpha: $(energy_optimal) tail_contribution: $(energy_tail_optimal) with_grid $(numeric.Egrid) \n")
- #  =#
- toc()
-    
+# tic()
+# #  #= Find optimal alpha
+#   function hyp_tan_model(x,p)
+#    return  -p[1] * tanh.((x-p[2])/p[3]) + p[4]   #note : -tanh(x) = -2/(e^(2x) +1 ) -1,    p[3]= 2*temperature in FD distribution
+#   end
+#   p0=[ 1 , mean(logAlpha), (logAlpha[end] -logAlpha[1])/2 , mean(logEnergy)  ]
+#   fit = curve_fit( hyp_tan_model, logAlpha,  logEnergy,  p0  )
+#   p= fit.param
+#   alpha_optimal =  exp( 1.5 *p[3] + p[2])
+#   println("fitted logE(loga): -$(p[1])*tanh((x-($(p[2])))/$(p[3])) + $(p[4])")
+#
+#
+# #  #= find optimal spectrum
+#   if alpha_optimal > mem_fit_parm.auxiliary_inverse_temp_range[2]   alpha_optimal=deepcopy(mem_fit_parm.auxiliary_inverse_temp_range[2]) 
+#   else
+#      mem_fit_parm.auxiliary_inverse_temp_range[2] = alpha_optimal
+#      realFreqFtn.Aw = deepcopy(realFreqFtn.Spectral_default_model)
+#      (logEnergy, logAlpha) = search_alpha( kernel,  realFreqFtn, imagFreqFtn,numeric,   mem_fit_parm, mixing_parm, false, fname_out, data_info, startOrbit)
+#   end
+#   energy_optimal = get_total_energy( imagFreqFtn, realFreqFtn.Aw, kernel,numeric);
+#   energy_tail_optimal = get_total_energy_for_tail( imagFreqFtn, realFreqFtn.Aw, kernel,numeric);
+#   println("optimal alpha: $(alpha_optimal),  log: $(log(alpha_optimal))")
+#   println("Total_energy_at_optimal_alpha: $(energy_optimal) tail_contribution: $(energy_tail_optimal) with_grid $(numeric.Egrid) \n")
+# #  =#
+# toc()
+#    
     
     
     

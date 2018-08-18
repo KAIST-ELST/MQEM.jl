@@ -239,7 +239,7 @@ end
 	      criteria_Aw_prev100 =  matrixFtn_norm(resdAw, numeric.dERealAxis) ;
           end
   
-          if iter%10 == 0  || iter == 1
+          if iter%20 == 0  || iter == 1
               #estimate criteria
               resdAw = Aw_in - Aw_out
 	      criteria_Aw =  matrixFtn_norm(resdAw,numeric.dERealAxis) ;
@@ -254,7 +254,7 @@ end
 			  realFreqFtn.Hw[:] = Hamiltonian_in
 			  break
 		  end
-                elseif(   ( (iter > numeric.NumIter &&  criteria_Aw > criteria_Aw_prev100) || criteria_Aw > criteria_Aw_prev100*2 )    )
+                elseif(   ( (iter > numeric.NumIter &&  criteria_Aw > criteria_Aw_prev100) || criteria_Aw > criteria_Aw_prev100*1.5 )    )
 	          E_in = get_total_energy(imagFreqFtn, Aw_in, kernel, numeric)
 	          E_out = get_total_energy(imagFreqFtn, Aw_out, kernel, numeric)
 		  resd_totE =  abs(E_in-E_out)
@@ -281,7 +281,6 @@ end
   
   
   function  search_alpha( kernel::strKernel,  realFreqFtn::strRealFreqFtn, imagFreqFtn::strImagFreqFtn, numeric::strNumeric,   mem_fit_parm::mem_fit_parm_, mixing_parm::mixing_parm_, write_information::Bool, fname_out, data_info::data_info_, startOrbit::Int64)
-  
       start_temperature = mem_fit_parm.auxiliary_inverse_temp_range[1]
       end_temperature =   mem_fit_parm.auxiliary_inverse_temp_range[2]
       logEnergy =  Array{Float64}(0)
@@ -310,6 +309,7 @@ end
       print_stdout= 10
       integrated_chi2_alpha_prev=0.0
 
+      search_start = time()
       while  true
           mixing = mixingNext
           auxTempRenomalFactor = min(1+ ((auxTempRenomalFactor-1)*1.01)   , 1.5*mem_fit_parm.auxTempRenomalFactorInitial)
@@ -343,54 +343,40 @@ end
           Energy = get_total_energy( imagFreqFtn, realFreqFtn.Aw, kernel,numeric)
           push!(logEnergy, log(Energy))
           push!(logAlpha, log(auxiliary_inverse_temp))
-
 	  progress = (auxiliary_inverse_temp - start_temperature)/(end_temperature-start_temperature) *100 
+
+
+
+
+
 	  if converg &&  progress > print_stdout
-                 #  #= Find optimal alpha
-                   function hyp_tan_model(x,p)
-                    return  -p[1] * tanh.((x-p[2])/p[3]) + p[4]   #note : -tanh(x) = -2/(e^(2x) +1 ) -1,    p[3]= 2*temperature in FD distribution
-                   end
-                   p0=[ 1 , mean(logAlpha), (logAlpha[end] -logAlpha[1])/2 , mean(logEnergy)  ]
-                   fit = curve_fit( hyp_tan_model, logAlpha,  logEnergy,  p0  )
-                   p= fit.param
-                   alpha_optimal =  exp( 1.5 *p[3] + p[2])
-		   #
-
-
-
-
-		   tempE   = deepcopy(logEnergy)
-		   tempAlp = deepcopy(logAlpha)
-		   a = (logEnergy[end]-logEnergy[1])/(logAlpha[end]-logAlpha[1]) 
-		   b = -a*logAlpha[1] +logEnergy[1]
-		   for l=1:length(logEnergy)
-		     tempE[l] = tempE[l] - (a*tempAlp[l]+b)
-		   end
-		   integrated_chi2_alpha = sum(tempE)
-
-	           @printf("%.1f \t alpha_inv: %.5f\t\t estimated_alpha_inv_opt: %.5f, and log:%.5f\n ",
-		   progress, auxiliary_inverse_temp, alpha_optimal, log(alpha_optimal))
-
-
-#		   if(progress >= 98 &&  alpha_optimal > auxiliary_inverse_temp)
-		   if(progress >= 98 &&  integrated_chi2_alpha > integrated_chi2_alpha_prev )
-          		   end_temperature *= 2
-		   end
+	           @printf("%.1f \t alpha_inv: %.5f\n  ",
+		   progress, auxiliary_inverse_temp)
+                   if write_information
+                       information_file=open("$(workDirect)/information.out","a")
+                       write(information_file,"$auxiliary_inverse_temp\t\t$(Energy) ; $(iter)\t$(mixing)\t$(auxTempRenomalFactor)   \n" )
+                       close(information_file)   
+               	       s= @sprintf "%.5f" auxiliary_inverse_temp
+                       write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw, kernel, fname_out,  "")
+         	   end
 		   print_stdout += 2
 	  end
       
-          if write_information
-              information_file=open("$(workDirect)/information.out","a")
-              write(information_file,"$auxiliary_inverse_temp\t\t$(Energy) ; $(iter)\t$(mixing)\t$(auxTempRenomalFactor)   \n" )
-              close(information_file)   
-	      s= @sprintf "%.5f" auxiliary_inverse_temp
-              write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw, kernel, fname_out,  "at_alpha_inv_$(s)")
-              write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw, kernel, fname_out,  "")
-	   end
+	  tempE   = deepcopy(logEnergy)
+	  tempAlp = deepcopy(logAlpha)
+	  a = (logEnergy[end]-logEnergy[1])/(logAlpha[end]-logAlpha[1]) 
+	  b = -a*logAlpha[1] +logEnergy[1]
+	  for l=1:length(logEnergy)
+	    tempE[l] = tempE[l] - (a*tempAlp[l]+b)
+	  end
+	  integrated_chi2_alpha = sum(tempE)
 
-      if  auxiliary_inverse_temp  >  end_temperature
-           break
-      end
+          if(progress >= 100 &&  integrated_chi2_alpha > integrated_chi2_alpha_prev )
+                  end_temperature *= 2
+          end
+          if  auxiliary_inverse_temp  >  end_temperature || time()-search_start > 600.0
+               break
+          end
       end #while_ (auxiliary_inverse_temp  <=  end_temperature)
   
 #      return  logEnergy,  logAlpha, end_temperature
