@@ -6,9 +6,11 @@
 #############################################################################################
 
 using LsqFit
+using LinearAlgebra
+using Printf
 global blur_width = 0.5;
 
-function get_total_energy_for_tail(imagFreqFtn ,Aw::Array{Array{Complex128,2}}, kernel, numeric)
+function get_total_energy_for_tail(imagFreqFtn ,Aw::Array{Array{ComplexF64,2}}, kernel, numeric)
         NumSubOrbit        = size(Aw[1])[1]
         moments =  kernel.moment * Aw
         temp = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3] - moments
@@ -23,12 +25,12 @@ end
 
 
 
-function get_total_energy(imagFreqFtn ,Aw::Array{Array{Complex128,2}}, kernel, numeric)
+function get_total_energy(imagFreqFtn ,Aw::Array{Array{ComplexF64,2}}, kernel, numeric)
         NumSubOrbit        = size(Aw[1])[1]
         Energy=0
-        EnergyMatrix=zeros(Complex128, NumSubOrbit, NumSubOrbit)
+        EnergyMatrix=zeros(ComplexF64, NumSubOrbit, NumSubOrbit)
         for n=1:numeric.N_Matsubara
-           GreenReproduced=zeros(Complex128, NumSubOrbit, NumSubOrbit)
+           GreenReproduced=zeros(ComplexF64, NumSubOrbit, NumSubOrbit)
            for w=1:numeric.Egrid
               GreenReproduced += (kernel.Kernel[n,w]*Aw[w])
            end
@@ -51,7 +53,7 @@ end
   
   
   
-  function matrixFtn_norm( Aw::Array{Array{Complex128,2}} , weight::Array{Float64})
+  function matrixFtn_norm( Aw::Array{Array{ComplexF64,2}} , weight::Array{Float64})
               # 1-norm, \int dw abs(A) = sum(abs(A))
               lengthOfVector = length(Aw)
 	      normVector_temp = Array{Float64}(lengthOfVector)
@@ -69,7 +71,7 @@ end
   function construct_model_spectrum(Green_Inf::Hermitian{Complex{Float64},Array{Complex{Float64},2}}, numeric, mem_fit_parm::mem_fit_parm_, NumSubOrbit::Int64, 
                                       center::Float64,  eta::Float64 , shape::String, kernel::strKernel)
 
-     Spectral_default_model =  Array{Array{Complex128,2}}(numeric.Egrid)
+     Spectral_default_model =  Array{Array{ComplexF64,2}}(numeric.Egrid)
      trace_model =  Array{Float64}(numeric.Egrid)
      for w = 1:numeric.Egrid
          E = numeric.ERealAxis[w]
@@ -104,7 +106,7 @@ end
   
   
   function Hamiltonian_zeroSet( imagFreqFtn, kernel,
-                                Egrid::Int64,Spectral_default_model::Array{Array{Complex128,2}}, auxiliary_inverse_temp::Float64)
+                                Egrid::Int64,Spectral_default_model::Array{Array{ComplexF64,2}}, auxiliary_inverse_temp::Float64)
                                      
 	  Gmoment = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3 ]
 	  Hamiltonian_out  = -auxiliary_inverse_temp * ( (kernel.Kernel_dagger)*(imagFreqFtn.GreenFtn) ) ;    
@@ -124,18 +126,18 @@ end
       return Hamiltonian_out
   end
   
-  function Hamiltonian_update(Aw::Array{Array{Complex128,2}},  Hamiltonian_zero::Array{Array{Complex128,2}}, numeric::strNumeric, auxiliary_inverse_temp::Float64, kernel::strKernel)
+  function Hamiltonian_update(Aw::Array{Array{ComplexF64,2}},  Hamiltonian_zero::Array{Array{ComplexF64,2}}, numeric::strNumeric, auxiliary_inverse_temp::Float64, kernel::strKernel)
       Hamiltonian_out = deepcopy(Hamiltonian_zero)
       Egrid = numeric.Egrid
       NumSubOrbit = size(Aw[1])[1]
   
-      A_transpose = zeros(Complex128, Egrid);
+      A_transpose = zeros(ComplexF64, Egrid);
       for i=1:NumSubOrbit*NumSubOrbit
           for w=1:Egrid
               A_transpose[w] = Aw[w][i]
           end
           h_updateTran  = kernel.Kernel*A_transpose
-          h_updateTran  = auxiliary_inverse_temp * (kernel.Kernel_dagger*(h_updateTran))::Array{Complex128}
+          h_updateTran  = auxiliary_inverse_temp * (kernel.Kernel_dagger*(h_updateTran))::Array{ComplexF64}
 
 	  h_update_moment = kernel.gamma * (kernel.moment * A_transpose)
 	  h_update_moment = auxiliary_inverse_temp *  (kernel.moment_dagger * h_update_moment)
@@ -153,10 +155,10 @@ end
   end
   
   
-  function spectralFunction_constructor(Hamiltonian::Array{Array{Complex128,2}}, NumSubOrbit::Int64, numeric::strNumeric, kernel::strKernel)
+  function spectralFunction_constructor(Hamiltonian::Array{Array{ComplexF64,2}}, NumSubOrbit::Int64, numeric::strNumeric, kernel::strKernel)
   
       local_trace_value = Array{Float64}(numeric.Egrid)
-      Aw_out =           Array{Array{Complex128,2}}(numeric.Egrid)
+      Aw_out =           Array{Array{ComplexF64,2}}(numeric.Egrid)
           E0=Array{Float64}(numeric.Egrid)
           if(NumSubOrbit ==1)
             for w=1:numeric.Egrid
@@ -180,7 +182,7 @@ end
           #sum_rule
 	  TotalPartitionFtn =  dot(kernel.moment[1,:],local_trace_value)
           for w=1:numeric.Egrid
-            Aw_out[w] *= 1./TotalPartitionFtn
+            Aw_out[w] *= 1 ./ TotalPartitionFtn
           end
           return Aw_out
   end
@@ -205,7 +207,7 @@ end
   function Aw_Iteration(realFreqFtn::strRealFreqFtn, imagFreqFtn::strImagFreqFtn, kernel::strKernel, auxiliary_inverse_temp::Float64, NumSubOrbit::Int64, numeric::strNumeric, mixing::Float64, mixing_parm::mixing_parm_)
       #Start iteration loop
       MixingInformation = pulayInfo(mixing_parm.pulay_mixing_history ,mixing_parm.pulay_mixing_start,  mixing_parm.pulay_mixing_step,
-                          Array{Array{Array{Complex128,2}}}(0), Array{Array{Array{Complex128,2}}}(0), Array{Array{Array{Complex128,2}}}(0),Array{Float64}(0), "simple" )
+                          Array{Array{Array{ComplexF64,2}}}(0), Array{Array{Array{ComplexF64,2}}}(0), Array{Array{Array{ComplexF64,2}}}(0),Array{Float64}(0), "simple" )
       pulayInitializer!(MixingInformation)
       converg = false; 
       iter=0;
@@ -220,9 +222,9 @@ end
       resd_totE=0
   
       mixing_local = mixing
-      Aw_out =           Array{Array{Complex128,2}}(numeric.Egrid)
-      Aw_in =            Array{Array{Complex128,2}}(numeric.Egrid)
-      Hamiltonian_in =            Array{Array{Complex128,2}}(numeric.Egrid)
+      Aw_out =           Array{Array{ComplexF64,2}}(numeric.Egrid)
+      Aw_in =            Array{Array{ComplexF64,2}}(numeric.Egrid)
+      Hamiltonian_in =            Array{Array{ComplexF64,2}}(numeric.Egrid)
   
       #Initial set
       Aw_in = deepcopy(realFreqFtn.Aw)
@@ -491,10 +493,10 @@ end
       inverse_temp = data_info.inverse_temp
       NumFullOrbit = data_info.NumFullOrbit
       
-      GreenFtn = Array{Array{Complex128,2}}(N_Matsubara)
-      GreenConstFull =  zeros(Complex128, NumFullOrbit,NumFullOrbit)
+      GreenFtn = Array{Array{ComplexF64,2}}(N_Matsubara)
+      GreenConstFull =  zeros(ComplexF64, NumFullOrbit,NumFullOrbit)
       for jj = 1:size(GreenFtn)[1]
-        GreenFtn[jj]= zeros(Complex128, NumSubOrbit,NumSubOrbit)
+        GreenFtn[jj]= zeros(ComplexF64, NumSubOrbit,NumSubOrbit)
       end
       
       #=
@@ -537,9 +539,9 @@ end
       
       #find moments
       NumMom=4
-      moments    = Array{Array{Complex128,2}}(4)
+      moments    = Array{Array{ComplexF64,2}}(4)
       momentstrace = Array{Array{Float64}}(4)
-      momentstest  = Array{Array{Array{Complex128,2}}}(4)
+      momentstest  = Array{Array{Array{ComplexF64,2}}}(4)
       momentstrace[1] = []
       momentstrace[2] = []
       momentstrace[3] = []
@@ -555,10 +557,10 @@ end
       for w_Asymto = w_Asymto_start:w_Asymto_end
         ASlen = N_Matsubara-w_Asymto+1   # num of Mat. freq. in the asymtotic region 
         KM =  zeros(Float64,ASlen*2,NumMom)
-        Gasym =  Array{Array{Complex128,2}}(ASlen*2)
+        Gasym =  Array{Array{ComplexF64,2}}(ASlen*2)
         for jj = 1:ASlen
             wn = (w_Asymto-1)+jj
-            z = ((2.*wn-1)*pi/inverse_temp);
+            z = ((2. * wn-1)*pi/inverse_temp);
             KM[2*jj-1,1] =   1.0        #const ,
             KM[2*jj,  2] =  -1/z        #norm  , >0
             KM[2*jj-1,3] =  -1/z^2      #<w>
@@ -569,7 +571,7 @@ end
 
         end
         KMsvdf = svdfact(KM, thin=false)
-        moments = (  ((KMsvdf[:Vt]')[:,1:NumMom]  * diagm(1./ KMsvdf[:S]) * (KMsvdf[:U]')[1:NumMom,:])   * Gasym   )
+        moments = (  ((KMsvdf[:Vt]')[:,1:NumMom]  * diagm(1.0 ./ KMsvdf[:S]) * (KMsvdf[:U]')[1:NumMom,:])   * Gasym   )
         push!(momentstest[1], Hermitian(moments[1]))   #const
         push!(momentstest[2], Hermitian(moments[2]))   #norm
         push!(momentstest[3], Hermitian(moments[3]))   #<w>
@@ -612,7 +614,7 @@ end
       if N_Matsubara > 500  &&  data_info.Asymtotic_HighFreq
         temp=[]
         for w = 1:N_Matsubara
-            z = ((2.*w-1)*pi/inverse_temp)im;
+            z = ((2. * w-1)*pi/inverse_temp)im;
             push!(temp,
             (norm( GreenFtn[w]  - (moments[1] + moments[2]/z + moments[3]/(z^2) + moments[4]/(z^3) ))    )/(norm(GreenFtn[w]))
             )
@@ -632,7 +634,7 @@ end
       println("read Giw_trace: $(-real(trace(moments[2])))/x +$(real(trace(moments[4])))/x**3")
       
       for iw = 1:numeric.N_Matsubara
-              z = ((2.*iw-1)*pi/inverse_temp)im;
+              z = ((2. * iw-1)*pi/inverse_temp)im;
               GreenFtn[iw] -= moments[1]
               GreenFtn[iw] /= Normalization
       end
@@ -656,12 +658,12 @@ end
   
   
   
-  function KK_relation( Aw::Array{Array{Complex128,2}},  numeric::strNumeric ) 
+  function KK_relation( Aw::Array{Array{ComplexF64,2}},  numeric::strNumeric ) 
     NumSubOrbit = size(Aw[1])[1]
     delta = 1e-10
-    Aw_RealPart = Array{Array{Complex128,2}}(numeric.Egrid)
+    Aw_RealPart = Array{Array{ComplexF64,2}}(numeric.Egrid)
     for jj = 1:size(Aw_RealPart)[1]
-      Aw_RealPart[jj]= zeros(Complex128, NumSubOrbit,NumSubOrbit)
+      Aw_RealPart[jj]= zeros(ComplexF64, NumSubOrbit,NumSubOrbit)
     end
     for w1 = 1:numeric.Egrid
         omega = numeric.ERealAxis[w1];
@@ -699,7 +701,7 @@ function smoothKernel(numeric::strNumeric, data_info::data_info_, dSegment)
 
    T = zeros(Float64, num_seg_coeff,  numeric.Egrid)
    B = zeros(Float64, num_seg_coeff, num_seg_coeff)
-   Kernel_from_cubic= zeros(Complex128, numeric.Egrid, num_seg_coeff)
+   Kernel_from_cubic= zeros(ComplexF64, numeric.Egrid, num_seg_coeff)
 
 
    for j=1:numeric.Egrid-1
@@ -760,14 +762,14 @@ end
      N_Matsubara = numeric.N_Matsubara
      
      kernel = strKernel(
-      zeros(Complex128, N_Matsubara,   numeric.Egrid)
-     ,zeros(Complex128, numeric.Egrid, N_Matsubara)
+      zeros(ComplexF64, N_Matsubara,   numeric.Egrid)
+     ,zeros(ComplexF64, numeric.Egrid, N_Matsubara)
      ,zeros(Float64, 3, numeric.Egrid)
      ,zeros(Float64, numeric.Egrid, 3)
-     ,zeros(Complex128, numeric.Egrid, numeric.Egrid)
-     ,zeros(Complex128, 4*(numeric.Egrid-1),numeric.Egrid)
-     ,zeros(Complex128, 3,3)
-     ,zeros(Complex128,numeric.Egrid, numeric.Egrid)
+     ,zeros(ComplexF64, numeric.Egrid, numeric.Egrid)
+     ,zeros(ComplexF64, 4*(numeric.Egrid-1),numeric.Egrid)
+     ,zeros(ComplexF64, 3,3)
+     ,zeros(ComplexF64,numeric.Egrid, numeric.Egrid)
      )
   
   
@@ -778,7 +780,7 @@ end
      end
      T = zeros(Float64, num_seg_coeff,  numeric.Egrid)
      B = zeros(Float64, num_seg_coeff, num_seg_coeff)
-     Kernel_from_cubic= zeros(Complex128, N_Matsubara, num_seg_coeff)
+     Kernel_from_cubic= zeros(ComplexF64, N_Matsubara, num_seg_coeff)
   
   
   
@@ -845,7 +847,7 @@ end
      f4(iwn, wj, dw ) =                                          -             log(-iwn + wj +dw)
   
      for n=1:N_Matsubara
-      iwn = ((2.*n-1)*pi/data_info.inverse_temp)im;
+      iwn = ((2. * n-1)*pi/data_info.inverse_temp)im;
       for j=1:numeric.Egrid-1
          wj = numeric.ERealAxis[j] 
          Kernel_from_cubic[n,4*(j-1)+1] = f1(iwn, wj, dSegment[j]) - f1(iwn, wj, 0)
@@ -870,7 +872,7 @@ end
      Gamma3 =  (data_info.inverse_temp^6)*(63/(945*64))
 
      for iw = 1:N_Matsubara
-      z = ((2.*iw-1)*pi/data_info.inverse_temp);
+      z = ((2. * iw-1)*pi/data_info.inverse_temp);
       Gamma1 -=      ((1/z  )^2)
       Gamma2 -=      ((1/z^2)^2)
       Gamma3 -=      ((1/z^3)^2)
@@ -899,22 +901,22 @@ end
      
      
 
-     g0a(wj, dw ) =  1./4. * dw^4
-     g0b(wj, dw ) =  1./3. * dw^3
-     g0c(wj, dw ) =  1./2. * dw^2
-     g0d(wj, dw ) =  1./1. * dw^1
+     g0a(wj, dw ) =  1. /4. * dw^4
+     g0b(wj, dw ) =  1. /3. * dw^3
+     g0c(wj, dw ) =  1. /2. * dw^2
+     g0d(wj, dw ) =  1. /1. * dw^1
 
-     g1a(wj, dw ) =  1./5. * dw^5 +  wj/4. * dw^4
-     g1b(wj, dw ) =  1./4. * dw^4 +  wj/3. * dw^3
-     g1c(wj, dw ) =  1./3. * dw^3 +  wj/2. * dw^2
-     g1d(wj, dw ) =  1./2. * dw^2 +  wj/1. * dw^1
+     g1a(wj, dw ) =  1. /5. * dw^5 +  wj/4. * dw^4
+     g1b(wj, dw ) =  1. /4. * dw^4 +  wj/3. * dw^3
+     g1c(wj, dw ) =  1. /3. * dw^3 +  wj/2. * dw^2
+     g1d(wj, dw ) =  1. /2. * dw^2 +  wj/1. * dw^1
 
-     g2a(wj, dw ) =  1./6. * dw^6 +  (2*wj)/5. * dw^5 + wj^2/4 * dw^4
-     g2b(wj, dw ) =  1./5. * dw^5 +  (2*wj)/4. * dw^4 + wj^2/3 * dw^3
-     g2c(wj, dw ) =  1./3. * dw^4 +  (2*wj)/3. * dw^3 + wj^2/2 * dw^2
-     g2d(wj, dw ) =  1./3. * dw^3 +  (2*wj)/2. * dw^2 + wj^2/1 * dw^1
+     g2a(wj, dw ) =  1. /6. * dw^6 +  (2*wj)/5. * dw^5 + wj^2/4 * dw^4
+     g2b(wj, dw ) =  1. /5. * dw^5 +  (2*wj)/4. * dw^4 + wj^2/3 * dw^3
+     g2c(wj, dw ) =  1. /3. * dw^4 +  (2*wj)/3. * dw^3 + wj^2/2 * dw^2
+     g2d(wj, dw ) =  1. /3. * dw^3 +  (2*wj)/2. * dw^2 + wj^2/1 * dw^1
 
-     moment_from_cubic = zeros(Complex128, 3, num_seg_coeff)
+     moment_from_cubic = zeros(ComplexF64, 3, num_seg_coeff)
      for j=1:numeric.Egrid-1
 	     wj = numeric.ERealAxis[j]
 	     moment_from_cubic[1,4*(j-1)+1] = g0a(wj, dSegment[j]) - g0a(wj, 0)
@@ -939,7 +941,7 @@ end
      
      for l=1:numeric.Egrid
        for n=1:N_Matsubara
-         iwn = ((2.*n-1)*pi/data_info.inverse_temp)im;
+         iwn = ((2. * n-1)*pi/data_info.inverse_temp)im;
 #         kernel.Kernel_dagger[l,n] = 1/(-iwn - numeric.ERealAxis[l] )
          kernel.Kernel_dagger[l,n] = -  ( log((iwn + numeric.ERealAxis[l] + blur_width)/(iwn + numeric.ERealAxis[l] - blur_width)) )/ (2*blur_width)
        end
@@ -954,7 +956,7 @@ end
 
 
      #differential
-     partial_from_cubic  = zeros(Complex128,numeric.Egrid, num_seg_coeff)
+     partial_from_cubic  = zeros(ComplexF64,numeric.Egrid, num_seg_coeff)
      for l=1:numeric.Egrid-1
 	     partial_from_cubic[l,4*(l-1)+1] = 0
 	     partial_from_cubic[l,4*(l-1)+2] = 0
@@ -983,9 +985,9 @@ end
 using NLsolve
 function p2ABC(p::Array{Float64},dim::Int64)
 
-    A=zeros(Complex128,dim,dim)
-    B=zeros(Complex128,dim,dim)
-    C=zeros(Complex128,dim,dim)
+    A=zeros(ComplexF64,dim,dim)
+    B=zeros(ComplexF64,dim,dim)
+    C=zeros(ComplexF64,dim,dim)
     for i=1:dim
         A[i,i]=p[i]
         B[i,i]=p[dim+i]
@@ -1009,7 +1011,7 @@ end
 
 
 function vec2utri(u::Array{Float64},v::Array{Float64},dim::Int64)
-    A=zeros(Complex128,dim,dim)
+    A=zeros(ComplexF64,dim,dim)
     t=1
     for i=1:dim
         for j=i+1:dim
@@ -1039,7 +1041,7 @@ end
 
 
 
-function gaussianPotential!(imagFreqFtn::strImagFreqFtn, realFreqFtn::strRealFreqFtn, kernel::strKernel, numeric::strNumeric, xinit, Aw::Array{Array{Complex128,2}})
+function gaussianPotential!(imagFreqFtn::strImagFreqFtn, realFreqFtn::strRealFreqFtn, kernel::strKernel, numeric::strNumeric, xinit, Aw::Array{Array{ComplexF64,2}})
 
 
 
@@ -1066,7 +1068,7 @@ function gaussianPotential!(imagFreqFtn::strImagFreqFtn, realFreqFtn::strRealFre
         #sum_rule
         TotalPartitionFtn =  kernel.moment[1,:]'local_trace_value
         for w=1:numeric.Egrid
-          Aw[w] *= 1./TotalPartitionFtn
+          Aw[w] *= 1. ./TotalPartitionFtn
         end
     
         mw = kernel.moment * Aw

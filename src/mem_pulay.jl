@@ -3,10 +3,10 @@
 ####################################################
 
 
-function matrixFtn_innerProduct( Aw::Array{Array{Complex128,2}} , Bw::Array{Array{Complex128,2}}, weight::Array{Float64})
+function matrixFtn_innerProduct( Aw::Array{Array{ComplexF64,2}} , Bw::Array{Array{ComplexF64,2}}, weight::Array{Float64})
             lengthOfVector = length(Aw)
 	    NumOrb = size(Aw[1])[1]
-            normVector_temp = Array{Complex128}(lengthOfVector)
+            normVector_temp = Array{ComplexF64}(lengthOfVector)
             for w=1:lengthOfVector
 		    normVector_temp[w] = trace( ( Aw[w]') * Bw[w] )  * weight[w]
             end
@@ -16,22 +16,22 @@ function matrixFtn_innerProduct( Aw::Array{Array{Complex128,2}} , Bw::Array{Arra
 end
 
 #Data store
-type pulayInfo
+mutable struct pulayInfo
     mixingMemory::Int64
     mixingStart::Int64
     mixingStep::Int64
-    inputHistory::Array{Array{Array{Complex128,2}}}
-    residHistory::Array{Array{Array{Complex128,2}}}
-    additionHistory::Array{Array{Array{Complex128,2}}}
+    inputHistory::Array{Array{Array{ComplexF64,2}}}
+    residHistory::Array{Array{Array{ComplexF64,2}}}
+    additionHistory::Array{Array{Array{ComplexF64,2}}}
     PulayMatrix::Array{Float64}
     previousMixing::String
 end
 
 #Initializer
 function pulayInitializer!(MixInfo::pulayInfo)
-    MixInfo.inputHistory = Array{Array{Array{Complex128,2}}}(MixInfo.mixingMemory);
-    MixInfo.residHistory = Array{Array{Array{Complex128,2}}}(MixInfo.mixingMemory);
-#    MixInfo.additionHistory = Array{Array{Array{Complex128,2}}}(MixInfo.mixingMemory);
+    MixInfo.inputHistory = Array{Array{Array{ComplexF64,2}}}(MixInfo.mixingMemory);
+    MixInfo.residHistory = Array{Array{Array{ComplexF64,2}}}(MixInfo.mixingMemory);
+#    MixInfo.additionHistory = Array{Array{Array{ComplexF64,2}}}(MixInfo.mixingMemory);
     MixInfo.PulayMatrix =  zeros(Float64, MixInfo.mixingMemory+1, MixInfo.mixingMemory+1);
     MixInfo.PulayMatrix[1, 2:end]=-1;
     MixInfo.PulayMatrix[2:end, 1]=-1;
@@ -42,7 +42,7 @@ end
 #Pulay Mixing
 #module pulay_DIIS_mixing
 function pulayMixing!(iter::Int64, mixing::Float64,
-         FtnIn::Array{Array{Complex128,2}},  FtnResid::Array{Array{Complex128,2}}, weight,
+         FtnIn::Array{Array{ComplexF64,2}},  FtnResid::Array{Array{ComplexF64,2}}, weight,
          MixInfo::pulayInfo)
     
     if iter<MixInfo.mixingStart #Simple Mixing

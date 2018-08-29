@@ -4,7 +4,7 @@
 #############################################################################################
 # (start) define Ftns
 #############################################################################################
-function write_results( NumSubOrbit::Int64, fname_out::Array{String}, fname_contniuedSpectrum::Array{String},Aw::Array{Array{Complex128,2}}, ERealAxis::Array{Float64}, Normalization::Float64, GreenConst::Array{Complex128}, Aw_RealPart::Array{Array{Complex128,2}}, Egrid::Int64)
+function write_results( NumSubOrbit::Int64, fname_out::Array{String}, fname_contniuedSpectrum::Array{String},Aw::Array{Array{ComplexF64,2}}, ERealAxis::Array{Float64}, Normalization::Float64, GreenConst::Array{ComplexF64}, Aw_RealPart::Array{Array{ComplexF64,2}}, Egrid::Int64)
 
    for i = 1:NumSubOrbit
        for j=1:NumSubOrbit
@@ -18,7 +18,7 @@ function write_results( NumSubOrbit::Int64, fname_out::Array{String}, fname_cont
    end
 
 
-  MatrixValuedOutPut= Array{Array{Complex128,2}}(Egrid)
+  MatrixValuedOutPut= Array{Array{ComplexF64,2}}(Egrid)
   for w=1:Egrid
         MatrixValuedOutPut[w] = Aw_RealPart[w] -pi*(Aw[w])im 
         MatrixValuedOutPut[w] *=  Normalization;
@@ -40,7 +40,7 @@ end
 
 
 
-function write_spectral_ftn(NumSubOrbit::Int64,Normalization::Float64,  numeric, SpecFtn::Array{Array{Complex128,2}}, kernel::strKernel,fname_out::Array{String} ,Deco::String  )
+function write_spectral_ftn(NumSubOrbit::Int64,Normalization::Float64,  numeric, SpecFtn::Array{Array{ComplexF64,2}}, kernel::strKernel,fname_out::Array{String} ,Deco::String  )
 
 
  FtnWrite = kernel.smooth * SpecFtn *Normalization
