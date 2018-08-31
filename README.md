@@ -1,4 +1,4 @@
-# Maximum Quentum Entropy Method (MQEM)
+# Maximum Quantum Entropy Method (MQEM)
 * Install Julia (https://julialang.org/downloads/)
 * MQEM module load path can be extended by defining the environment variable JULIA_LOAD_PATH.
   ```ShellSession
