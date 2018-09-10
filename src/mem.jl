@@ -15,14 +15,15 @@ import TOML
 
 
 using MQEM
-
+using DelimitedFiles
+using LinearAlgebra
 
 #input  param
 
 run(`touch mqem.input.toml`)
 input_toml = TOML.parsefile("mqem.input.toml")
 function input_ftn(var::String)
-  if haskey(input_toml, var) 
+  if haskey(input_toml, var)
      println("Input : $(var):",input_toml[var] )
     return input_toml[var]
   else
@@ -31,7 +32,7 @@ function input_ftn(var::String)
   end
 end
 function input_ftn(var::String, val)
-  if haskey(input_toml, var) 
+  if haskey(input_toml, var)
      println("Input : $(var):",input_toml[var] )
     return input_toml[var]
   else
@@ -135,7 +136,7 @@ inputInfo = strInputInfo(data_info,
 			 )
 
 #############################################################################################
-# (Start) Initialize real space variables 
+# (Start) Initialize real space variables
 #############################################################################################
 
 
@@ -169,20 +170,20 @@ phyParm = strPhyParm(
 
 
 realFreqFtn  = strRealFreqFtn(
-  Array{Array{Complex128,2}}(numeric.Egrid)
- ,Array{Array{Complex128,2}}(numeric.Egrid)
- ,Array{Array{Complex128,2}}(numeric.Egrid)
- ,Array{Array{Complex128,2}}(numeric.Egrid)
- ,Array{Array{Complex128,2}}(numeric.Egrid)
+  Array{Array{ComplexF64,2}}(numeric.Egrid)
+ ,Array{Array{ComplexF64,2}}(numeric.Egrid)
+ ,Array{Array{ComplexF64,2}}(numeric.Egrid)
+ ,Array{Array{ComplexF64,2}}(numeric.Egrid)
+ ,Array{Array{ComplexF64,2}}(numeric.Egrid)
 )
 for w=1:numeric.Egrid
-   realFreqFtn.H_extern[w] = Hermitian(zeros(Complex128, phyParm.NumSubOrbit, phyParm.NumSubOrbit))
+   realFreqFtn.H_extern[w] = Hermitian(zeros(ComplexF64, phyParm.NumSubOrbit, phyParm.NumSubOrbit))
 end
 
 
 
 #############################################################################################
-# (end) Initialize variables 
+# (end) Initialize variables
 #############################################################################################
 
 #etc...
@@ -212,68 +213,68 @@ f=open("$(workDirect)/information.out","w");write(f,"\n" );close(f)
 for cluster=start_cluster:num_of_subblock-1
     global startOrbit = phyParm.NumSubOrbit*cluster
     println("Block = $(startOrbit)")
-    
+
     # =#
     #file
 #    global fname = "$(workDirect)/$(inputFile)"
-    global fname_out = Array{String}(phyParm.NumSubOrbit,phyParm.NumSubOrbit)
-    global fname_contniuedSpectrum = Array{String}(phyParm.NumSubOrbit,phyParm.NumSubOrbit)
-    global fname_reproduce = Array{String}(phyParm.NumSubOrbit,phyParm.NumSubOrbit)
+    global fname_out = Array{String}(undef,phyParm.NumSubOrbit,phyParm.NumSubOrbit)
+    global fname_contniuedSpectrum = Array{String}(undef,phyParm.NumSubOrbit,phyParm.NumSubOrbit)
+    global fname_reproduce = Array{String}(undef,phyParm.NumSubOrbit,phyParm.NumSubOrbit)
     for i = 0:phyParm.NumSubOrbit-1
         for j=0:phyParm.NumSubOrbit-1
             fname_out[i+1,j+1] = "$(workDirect)/spectral_function_$(i+startOrbit)_$(j+startOrbit).dat"
-      fname_reproduce[i+1,j+1] = "$(workDirect)/reproduce_$(i+startOrbit)_$(j+startOrbit).out"
-      fname_contniuedSpectrum[i+1,j+1] = "$(workDirect)/realFreq_Sw.dat_$(i+startOrbit+1)_$(j+startOrbit+1)"
+            fname_reproduce[i+1,j+1] = "$(workDirect)/reproduce_$(i+startOrbit)_$(j+startOrbit).out"
+            fname_contniuedSpectrum[i+1,j+1] = "$(workDirect)/realFreq_Sw.dat_$(i+startOrbit+1)_$(j+startOrbit+1)"
         end
     end
-    
-    
-    GreenConstFull =  zeros(Complex128, NumFullOrbit,NumFullOrbit)
+
+
+    GreenConstFull =  zeros(ComplexF64, NumFullOrbit,NumFullOrbit)
     (imagFreqFtn) = read_matsubara_GreenFtn!( data_info,  numeric, startOrbit, phyParm.NumSubOrbit)
     kernel = construct_Kernel_inCubicSpline(numeric, data_info)
     sigmaFlat = (EwinInnerRight - EwinInnerLeft)
-    
-    sigma = min(( trace(imagFreqFtn.moments3)-trace(imagFreqFtn.moments2)^2),  ((EwinOuterRight - EwinOuterLeft)/4)^2)
+
+    sigma = min(( tr(imagFreqFtn.moments3)-tr(imagFreqFtn.moments2)^2),  ((EwinOuterRight - EwinOuterLeft)/4)^2)
     if sigma>0
        sigma = sqrt(sigma)
-    else 
+    else
       default_model = "f"
     end
-    
-    
+
+
     if(default_model=="f") #flat default_model
-	    realFreqFtn.Spectral_default_model = 
-	    construct_model_spectrum(imagFreqFtn.moments1, numeric,inputInfo.mem_fit_parm,  phyParm.NumSubOrbit, 
-				     trace(imagFreqFtn.moments2), sigmaFlat,"F", kernel) 
+	    realFreqFtn.Spectral_default_model =
+	    construct_model_spectrum(imagFreqFtn.moments1, numeric,inputInfo.mem_fit_parm,  phyParm.NumSubOrbit,
+				     tr(imagFreqFtn.moments2), sigmaFlat,"F", kernel)
 
     elseif(default_model =="g")
 	    realFreqFtn.Spectral_default_model =
 	    construct_model_spectrum(imagFreqFtn.moments1, numeric,inputInfo.mem_fit_parm,  phyParm.NumSubOrbit,
-				     trace(imagFreqFtn.moments2), trace(imagFreqFtn.moments3)/phyParm.NumSubOrbit,"G", kernel)
+				     tr(imagFreqFtn.moments2), tr(imagFreqFtn.moments3)/phyParm.NumSubOrbit,"G", kernel)
 
     elseif(default_model=="g_mat")  #gaussian default_model
       Ainit= Hermitian(-1.0/(2*sigma^2) *eye(imagFreqFtn.moments2))
-      Binit= Hermitian(-( trace(imagFreqFtn.moments2) / sigma^2)*eye(imagFreqFtn.moments2))
-      s= 3*phyParm.NumSubOrbit +2*3*(div(phyParm.NumSubOrbit*(phyParm.NumSubOrbit-1),2)) -1     # -1 come from the fact that C=trace less
+      Binit= Hermitian(-( tr(imagFreqFtn.moments2) / sigma^2)*eye(imagFreqFtn.moments2))
+      s= 3*phyParm.NumSubOrbit +2*3*(div(phyParm.NumSubOrbit*(phyParm.NumSubOrbit-1),2)) -1     # -1 come from the fact that C=tr less
         # First term = diagonal for A,B,C
         # sencdterm = real, imag foa off-diagoal of the  A,B,C
-    
+
       xinit=zeros(Float64,s)
-    
+
       for i=1:phyParm.NumSubOrbit
            xinit[i]                     = Ainit[i,i]
            xinit[phyParm.NumSubOrbit+i] = Binit[i,i]
       end
-     
+
       xinit = gaussianPotential!(imagFreqFtn, realFreqFtn, kernel, numeric, xinit, realFreqFtn.Spectral_default_model)
       moments_rep  = kernel.moment * realFreqFtn.Spectral_default_model
-      println("Model: $(-real(trace(moments_rep[1])))/x +$(real(trace(moments_rep[3])))/x**3")
+      println("Model: $(-real(tr(moments_rep[1])))/x +$(real(tr(moments_rep[3])))/x**3")
     end
-    
+
     temp = deepcopy(realFreqFtn.Spectral_default_model)
     write_spectral_ftn(phyParm.NumSubOrbit, imagFreqFtn.Normalization, numeric, temp, kernel, fname_out, "_model")
     temp = []
-    
+
 
 
  #Main part!########################################################################
@@ -285,7 +286,7 @@ for cluster=start_cluster:num_of_subblock-1
    (logEnergy, logAlpha) = search_alpha( kernel,  realFreqFtn, imagFreqFtn,  numeric, mem_fit_parm, mixing_parm, true, fname_out, data_info, startOrbit)
  #  =#
  toc()
- 
+
 
 
 
@@ -303,7 +304,7 @@ for cluster=start_cluster:num_of_subblock-1
 #
 #
 # #  #= find optimal spectrum
-#   if alpha_optimal > mem_fit_parm.auxiliary_inverse_temp_range[2]   alpha_optimal=deepcopy(mem_fit_parm.auxiliary_inverse_temp_range[2]) 
+#   if alpha_optimal > mem_fit_parm.auxiliary_inverse_temp_range[2]   alpha_optimal=deepcopy(mem_fit_parm.auxiliary_inverse_temp_range[2])
 #   else
 #      mem_fit_parm.auxiliary_inverse_temp_range[2] = alpha_optimal
 #      realFreqFtn.Aw = deepcopy(realFreqFtn.Spectral_default_model)
@@ -315,15 +316,15 @@ for cluster=start_cluster:num_of_subblock-1
 #   println("Total_energy_at_optimal_alpha: $(energy_optimal) tail_contribution: $(energy_tail_optimal) with_grid $(numeric.Egrid) \n")
 # #  =#
 # toc()
-#    
-    
-    
-    
+#
+
+
+
     ##################################################################################
     #KK relation
     Aw_RealPart = KK_relation( realFreqFtn.Aw, numeric)
     write_results(phyParm.NumSubOrbit, fname_out, fname_contniuedSpectrum, realFreqFtn.Aw, numeric.ERealAxis, imagFreqFtn.Normalization, imagFreqFtn.GreenConst, Aw_RealPart, numeric.Egrid)
-    
+
     for Exchangecluster=cluster+1:num_of_subblock-1
       for i = 1:phyParm.NumSubOrbit
           for j=1:phyParm.NumSubOrbit
@@ -347,6 +348,6 @@ for cluster=start_cluster:num_of_subblock-1
        end
     end
 
-##=  mainloop end 
+##=  mainloop end
 end
 #############################################################################################
