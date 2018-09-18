@@ -54,6 +54,7 @@ end
 ####################################################
 workDirect      =     input_ftn("workDirect", pwd())
 inputFile       =     input_ftn("inputFile", "Sw_SOLVER.full.dat")
+outputFileUseinputFile = input_ftn("outputFileUseinputFile",false)
 inverse_temp        = input_ftn("inverse_temp" ,-1.0            )
 if inverse_temp <0
 inverse_temp =input_extern("BETA", "../../input.solver")
@@ -134,6 +135,11 @@ inputInfo = strInputInfo(data_info,
 			 mem_fit_parm,
 			 mixing_parm
 			 )
+outputPrefix = "realFreq_Sw.dat_";
+if outputFileUseinputFile
+ outputPrefix = inputFile*"_realFreq_Sw.dat_"
+end
+println("outputPrefix ",outputPrefix)
 
 #############################################################################################
 # (Start) Initialize real space variables
@@ -170,11 +176,11 @@ phyParm = strPhyParm(
 
 
 realFreqFtn  = strRealFreqFtn(
-  Array{Array{ComplexF64,2}}(numeric.Egrid)
- ,Array{Array{ComplexF64,2}}(numeric.Egrid)
- ,Array{Array{ComplexF64,2}}(numeric.Egrid)
- ,Array{Array{ComplexF64,2}}(numeric.Egrid)
- ,Array{Array{ComplexF64,2}}(numeric.Egrid)
+  Array{Array{ComplexF64,2}}(undef,numeric.Egrid)
+ ,Array{Array{ComplexF64,2}}(undef,numeric.Egrid)
+ ,Array{Array{ComplexF64,2}}(undef,numeric.Egrid)
+ ,Array{Array{ComplexF64,2}}(undef,numeric.Egrid)
+ ,Array{Array{ComplexF64,2}}(undef,numeric.Egrid)
 )
 for w=1:numeric.Egrid
    realFreqFtn.H_extern[w] = Hermitian(zeros(ComplexF64, phyParm.NumSubOrbit, phyParm.NumSubOrbit))
@@ -224,7 +230,7 @@ for cluster=start_cluster:num_of_subblock-1
         for j=0:phyParm.NumSubOrbit-1
             fname_out[i+1,j+1] = "$(workDirect)/spectral_function_$(i+startOrbit)_$(j+startOrbit).dat"
             fname_reproduce[i+1,j+1] = "$(workDirect)/reproduce_$(i+startOrbit)_$(j+startOrbit).out"
-            fname_contniuedSpectrum[i+1,j+1] = "$(workDirect)/realFreq_Sw.dat_$(i+startOrbit+1)_$(j+startOrbit+1)"
+            fname_contniuedSpectrum[i+1,j+1] = "$(workDirect)/$(outputPrefix)$(i+startOrbit+1)_$(j+startOrbit+1)"
         end
     end
 
@@ -330,14 +336,15 @@ for cluster=start_cluster:num_of_subblock-1
           for j=1:phyParm.NumSubOrbit
               ifull=i+startOrbit;
               jfull= j+ (phyParm.NumSubOrbit*Exchangecluster)
-              f=open("$(workDirect)/realFreq_Sw.dat_$(ifull)_$(jfull)","w")
+
+              f=open("$(workDirect)/$(outputPrefix)$(ifull)_$(jfull)","w")
               for w=1:numeric.Egrid
                   E = numeric.ERealAxis[w]
                   Ftnij =  imagFreqFtn.GreenConstFull[ifull,jfull]
                   write(f, "$E $(real(Ftnij)) $(imag(Ftnij))\n")
               end
               close(f)
-              f=open("$(workDirect)/realFreq_Sw.dat_$(jfull)_$(ifull)","w")
+              f=open("$(workDirect)/$(outputPrefix)$(jfull)_$(ifull)","w")
               for w=1:numeric.Egrid
                   E = numeric.ERealAxis[w]
                   Ftnji = imagFreqFtn.GreenConstFull[jfull,ifull]
