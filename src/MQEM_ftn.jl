@@ -476,6 +476,14 @@ end
 function find_default_parm(workDirect, inputFile, inverse_temp  )
     fname = "$(workDirect)/$(inputFile)"
     Giw_raw = readdlm(fname);
+    if (3 == size(Giw_raw)[2])
+        N_N_Matsubara =  size(Giw_raw)[1]
+        Giw_raw_tmp = zeros(N_N_Matsubara,5)
+        Giw_raw_tmp[:,1] = collect(0:N_N_Matsubara-1)
+        Giw_raw_tmp[:,4:5] = Giw_raw[:,2:3]
+
+        Giw_raw = Giw_raw_tmp;
+    end
     w_index = convert(Array{Int64,1},Giw_raw[:,1]);
     orb_index=convert(Array{Int64,1},Giw_raw[:,2]);
     NMat_file = maximum(w_index)+1
@@ -502,6 +510,14 @@ end
       #Read Matsubara Green's Ftn
       =#
       A = readdlm(fname);
+      if (3 == size(A)[2])
+          N_N_Matsubara =  size(A)[1]
+          A_tmp      = zeros(N_N_Matsubara,5)
+          A_tmp[:,1] = collect(0:N_N_Matsubara-1)
+          A_tmp[:,4:5] = A[:,2:3]
+
+          A = A_tmp;
+      end
 
       B=convert(Array{Int64,2},A[:,1:3]);
       C = A[:,4:end];
