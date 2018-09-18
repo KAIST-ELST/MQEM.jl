@@ -23,7 +23,7 @@ run(`touch mqem.input.toml`)
 input_toml = TOML.parsefile("mqem.input.toml")
 function input_ftn(var::String)
   if haskey(input_toml, var) 
-     println("Input : $(var):",input_toml[var] )
+     println("Input : $(var) = ",input_toml[var] )
     return input_toml[var]
   else
      println("Input error: ",var )
@@ -32,10 +32,10 @@ function input_ftn(var::String)
 end
 function input_ftn(var::String, val)
   if haskey(input_toml, var) 
-     println("Input : $(var):",input_toml[var] )
+     println("Input : $(var) = ",input_toml[var] )
     return input_toml[var]
   else
-     println("Input default: $(var):",val )
+     println("Input default: $(var) = ",val )
     return val
   end
 end
@@ -43,7 +43,7 @@ function input_extern(var::String, extern_file::String)
   extern_read = readdlm(extern_file)
   for line =1:size(extern_read)[1]
     if extern_read[line,1] == var
-      println("Input : $(var):", extern_read[line,3] )
+      println("Input : $(var) = ", extern_read[line,3] )
       return extern_read[line,3]
     end
   end
@@ -96,7 +96,7 @@ real_freq_grid_info= real_freq_grid_info_(EwinOuterRight,
 					   EgridInner
 					   )
 
-default_model  = input_ftn("default_model" ,"f")
+default_model  = input_ftn("default_model" ,"f") # g, g_mat
 Model_range_right = input_ftn("Model_right",EwinOuterRight)
 Model_range_left  = input_ftn("Model_left" ,EwinOuterLeft)
 auxiliary_inverse_temp_range = input_ftn("auxiliary_inverse_temp_range", [1e-2, 1.0] )
