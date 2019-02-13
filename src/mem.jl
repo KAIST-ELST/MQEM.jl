@@ -1,6 +1,5 @@
 # fit to find optimal alpha
-# https://github.com/JuliaNLSolvers/LsqFit.jl
-#Pkg.clone("https://github.com/wildart/TOML.jl.git")
+
 ###########################################
 # Jae-Hoon Sim, KAIST 2018.01.
 #2018.07.13
@@ -9,8 +8,8 @@
 
 
 
-using LsqFit
-import TOML
+using LsqFit  # add https://github.com/JuliaNLSolvers/LsqFit.jl
+import TOML   # add https://github.com/wildart/TOML.jl.git
 
 
 
@@ -216,16 +215,19 @@ println("sub-space dim=$(phyParm.NumSubOrbit)")
 
 ####start main
 f=open("$(workDirect)/information.out","w");write(f,"\n" );close(f)
+
+
+println("default_model: $(default_model)")
 for cluster=start_cluster:num_of_subblock-1
-    global startOrbit = phyParm.NumSubOrbit*cluster
+    startOrbit = phyParm.NumSubOrbit*cluster
     println("Block = $(startOrbit)")
 
     # =#
     #file
-#    global fname = "$(workDirect)/$(inputFile)"
-    global fname_out = Array{String}(undef,phyParm.NumSubOrbit,phyParm.NumSubOrbit)
-    global fname_contniuedSpectrum = Array{String}(undef,phyParm.NumSubOrbit,phyParm.NumSubOrbit)
-    global fname_reproduce = Array{String}(undef,phyParm.NumSubOrbit,phyParm.NumSubOrbit)
+    fname_out = Array{String}(undef,phyParm.NumSubOrbit,phyParm.NumSubOrbit)
+    fname_contniuedSpectrum = Array{String}(undef,phyParm.NumSubOrbit,phyParm.NumSubOrbit)
+    fname_reproduce = Array{String}(undef,phyParm.NumSubOrbit,phyParm.NumSubOrbit)
+
     for i = 0:phyParm.NumSubOrbit-1
         for j=0:phyParm.NumSubOrbit-1
             fname_out[i+1,j+1] = "$(workDirect)/spectral_function_$(i+startOrbit)_$(j+startOrbit).dat"
@@ -244,7 +246,7 @@ for cluster=start_cluster:num_of_subblock-1
     if sigma>0
        sigma = sqrt(sigma)
     else
-      default_model = "f"
+      global default_model = "f"
     end
 
 
@@ -281,17 +283,15 @@ for cluster=start_cluster:num_of_subblock-1
     write_spectral_ftn(phyParm.NumSubOrbit, imagFreqFtn.Normalization, numeric, temp, kernel, fname_out, "_model")
     temp = []
 
-
-
- #Main part!########################################################################
- tic()
-    f=open("$(workDirect)/information.out","a");write(f,"\nsub_block$(cluster)\n" );close(f)
- # #=
- #  #= get aux. temperature spectrum
-   realFreqFtn.Aw = deepcopy(realFreqFtn.Spectral_default_model)
-   (logEnergy, logAlpha) = search_alpha( kernel,  realFreqFtn, imagFreqFtn,  numeric, mem_fit_parm, mixing_parm, true, fname_out, data_info, startOrbit)
- #  =#
- toc()
+    #Main part!########################################################################
+#    tic()
+       f=open("$(workDirect)/information.out","a");write(f,"\nsub_block$(cluster)\n" );close(f)
+    # #=
+    #  #= get aux. temperature spectrum
+      realFreqFtn.Aw = deepcopy(realFreqFtn.Spectral_default_model)
+      (logEnergy, logAlpha) = search_alpha( kernel,  realFreqFtn, imagFreqFtn,  numeric, mem_fit_parm, mixing_parm, true, fname_out, data_info, startOrbit)
+    #  =#
+#    toc()
 
 
 

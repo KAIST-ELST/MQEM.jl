@@ -33,8 +33,8 @@ function pulayInitializer!(MixInfo::pulayInfo)
     MixInfo.residHistory = Array{Array{Array{ComplexF64,2}}}(undef,MixInfo.mixingMemory);
 #    MixInfo.additionHistory = Array{Array{Array{ComplexF64,2}}}(MixInfo.mixingMemory);
     MixInfo.PulayMatrix =  zeros(Float64, MixInfo.mixingMemory+1, MixInfo.mixingMemory+1);
-    MixInfo.PulayMatrix[1, 2:end]=-1;
-    MixInfo.PulayMatrix[2:end, 1]=-1;
+    MixInfo.PulayMatrix[1, 2:end]=-ones(size(MixInfo.PulayMatrix[1, 2:end]));
+    MixInfo.PulayMatrix[2:end, 1]=-ones(size(MixInfo.PulayMatrix[2:end, 1]));
 end
 
 

@@ -8,6 +8,10 @@
 using LsqFit
 using LinearAlgebra
 using Printf
+using DelimitedFiles  #readdlm
+
+using Statistics  # var
+
 global blur_width = 0.5;
 
 function get_total_energy_for_tail(imagFreqFtn ,Aw::Array{Array{ComplexF64,2}}, kernel, numeric)
@@ -16,7 +20,7 @@ function get_total_energy_for_tail(imagFreqFtn ,Aw::Array{Array{ComplexF64,2}}, 
         temp = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3] - moments
         Energy_tail=0;
         for mom = 1:3
-      	  Energy_tail +=  kernel.gamma[mom,mom]* vecnorm( temp[mom])^2
+      	  Energy_tail +=  kernel.gamma[mom,mom]* norm( temp[mom])^2
         end
         Energy_tail +=  2*kernel.gamma[1,3]* real(tr(temp[1]'*temp[3]))
 
@@ -35,14 +39,14 @@ function get_total_energy(imagFreqFtn ,Aw::Array{Array{ComplexF64,2}}, kernel, n
               GreenReproduced += (kernel.Kernel[n,w]*Aw[w])
            end
            EnergyMatrix = (imagFreqFtn.GreenFtn[n] - GreenReproduced)
-           Energy    +=    (vecnorm(EnergyMatrix)^2)
+           Energy    +=    (norm(EnergyMatrix)^2)
         end
 
         moments =  kernel.moment * Aw
         temp = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3 ] - moments
         Energy_tail=0;
         for mom = 1:3
-      	  Energy_tail +=  kernel.gamma[mom,mom]* vecnorm( temp[mom])^2
+      	  Energy_tail +=  kernel.gamma[mom,mom]* norm( temp[mom])^2
          end
         Energy_tail +=  2*kernel.gamma[1,3]* real(tr(temp[1]'*temp[3]))
         Energy  += Energy_tail
@@ -58,7 +62,7 @@ end
     lengthOfVector = length(Aw)
     normVector_temp = Array{Float64}(undef,lengthOfVector)
     for w=1:lengthOfVector
-      normVector_temp[w]  =  (vecnorm(Aw[w]))^2  *weight[w]
+      normVector_temp[w]  =  (norm(Aw[w]))^2  *weight[w]
     end
 #	      res = dot(normVector_temp,weight)::Float64
     res = sum(normVector_temp)
@@ -79,13 +83,13 @@ end
            Spectral_default_model[w] = Hermitian( (Green_Inf *( exp.(-0.5 *((E-center)/eta)^2) + (1e-30)    ) ) )
 	          trace_model[w] = tr(Spectral_default_model[w])
          elseif(shape == "L")
-           Spectral_default_model[w] = (Green_Inf * 1/( (E-center)^2 + eta^2) +1e-30*(eye(Green_Inf)) )
+           Spectral_default_model[w] = (Green_Inf * 1/( (E-center)^2 + eta^2) +1e-30*(one(Green_Inf)) )
 	         trace_model[w] = tr(Spectral_default_model[w])
          elseif(shape == "F")
 		 if(mem_fit_parm.Model_range_left<E &&  E<mem_fit_parm.Model_range_right)
 		   Spectral_default_model[w] = Green_Inf/(mem_fit_parm.Model_range_right-mem_fit_parm.Model_range_left)
 	         else
-		   Spectral_default_model[w] = 0.0* eye(Green_Inf)
+		   Spectral_default_model[w] = 0.0* one(Green_Inf)
 	         end
 	         trace_model[w] = tr(Spectral_default_model[w])
          end
@@ -115,7 +119,7 @@ end
       # d(G-KA)^2 =  -K'(G - KA) , second term,i.e. K'K,  = interaction term,
 
       for w=1:Egrid
-          Hamiltonian_out[w] -=  log.( (Spectral_default_model[w]) + 1e-15*eye(Spectral_default_model[w]) )
+          Hamiltonian_out[w] -=  log.( (Spectral_default_model[w]) + 1e-15*one(Spectral_default_model[w]) )
           Hamiltonian_out[w] +=  Hamiltonian_out[w]'    ;
       end
       Hamiltonian_out *=      (0.5);
@@ -171,7 +175,7 @@ end
           end
           chempot = minimum(E0)
           for w=1:numeric.Egrid
-              Hamiltonian[w] -= chempot*eye(Hamiltonian[w])
+              Hamiltonian[w] -= chempot*one(Hamiltonian[w])
           end
 
           #Construct A(w) from input H
@@ -284,8 +288,8 @@ end
   function  search_alpha( kernel::strKernel,  realFreqFtn::strRealFreqFtn, imagFreqFtn::strImagFreqFtn, numeric::strNumeric,   mem_fit_parm::mem_fit_parm_, mixing_parm::mixing_parm_, write_information::Bool, fname_out, data_info::data_info_, startOrbit::Int64)
       start_temperature = mem_fit_parm.auxiliary_inverse_temp_range[1]
       end_temperature =   mem_fit_parm.auxiliary_inverse_temp_range[2]
-      logEnergy =  Array{Float64}(0)
-      logAlpha  =  Array{Float64}(0)
+      logEnergy =  Array{Float64}(undef, 0)
+      logAlpha  =  Array{Float64}(undef, 0)
       mixing =  0.0::Float64
       Aw = deepcopy(realFreqFtn.Aw)
       Aw_SVD = deepcopy(realFreqFtn.Aw)
@@ -500,7 +504,7 @@ end
       inverse_temp = data_info.inverse_temp
       NumFullOrbit = data_info.NumFullOrbit
 
-      GreenFtn = Array{Array{ComplexF64,2}}(N_Matsubara)
+      GreenFtn = Array{Array{ComplexF64,2}}(undef, N_Matsubara)
       GreenConstFull =  zeros(ComplexF64, NumFullOrbit,NumFullOrbit)
       for jj = 1:size(GreenFtn)[1]
         GreenFtn[jj]= zeros(ComplexF64, NumSubOrbit,NumSubOrbit)
@@ -554,9 +558,9 @@ end
 
       #find moments
       NumMom=4
-      moments    = Array{Array{ComplexF64,2}}(4)
-      momentstrace = Array{Array{Float64}}(4)
-      momentstest  = Array{Array{Array{ComplexF64,2}}}(4)
+      moments    =   Array{Array{ComplexF64,2}}(undef, 4)
+      momentstrace = Array{Array{Float64}}(undef,4)
+      momentstest  = Array{Array{Array{ComplexF64,2}}}(undef, 4)
       momentstrace[1] = []
       momentstrace[2] = []
       momentstrace[3] = []
@@ -572,7 +576,7 @@ end
       for w_Asymto = w_Asymto_start:w_Asymto_end
         ASlen = N_Matsubara-w_Asymto+1   # num of Mat. freq. in the asymtotic region
         KM =  zeros(Float64,ASlen*2,NumMom)
-        Gasym =  Array{Array{ComplexF64,2}}(ASlen*2)
+        Gasym =  Array{Array{ComplexF64,2}}(undef,ASlen*2)
         for jj = 1:ASlen
             wn = (w_Asymto-1)+jj
             z = ((2. * wn-1)*pi/inverse_temp);
@@ -585,8 +589,9 @@ end
             Gasym[2*jj  ] = Hermitian((GreenFtn[wn] - GreenFtn[wn]')/(2im));
 
         end
-        KMsvdf = svdfact(KM, thin=false)
-        moments = (  ((KMsvdf[:Vt]')[:,1:NumMom]  * diagm(1.0 ./ KMsvdf[:S]) * (KMsvdf[:U]')[1:NumMom,:])   * Gasym   )
+#        KMsvdf = svdfact(KM, thin=false)
+        KMsvdf = svd(KM, full=true)
+        moments = (  (( (KMsvdf.Vt)')[:,1:NumMom]  * diagm( 0 => 1.0 ./ KMsvdf.S) * ( (KMsvdf.U)')[1:NumMom,:])   * Gasym   )
         push!(momentstest[1], Hermitian(moments[1]))   #const
         push!(momentstest[2], Hermitian(moments[2]))   #norm
         push!(momentstest[3], Hermitian(moments[3]))   #<w>
@@ -604,7 +609,7 @@ end
          for j = Nv+1:w_Asymto_range-Nv
                  push!(var_j , var(momentstrace[mom][j-Nv:j+Nv])  )
          end
-         j0 = indmin(var_j) + Nv
+         j0 = argmin(var_j) + Nv
          moments[mom] =  mean(momentstest[mom][j0-Nv:j0+Nv])
       end
 
@@ -634,7 +639,7 @@ end
             (norm( GreenFtn[w]  - (moments[1] + moments[2]/z + moments[3]/(z^2) + moments[4]/(z^3) ))    )/(norm(GreenFtn[w]))
             )
         end
-        numeric.N_Matsubara = indmin(temp)
+        numeric.N_Matsubara = argmin(temp)
 
         println("Asymto iwn = $((2*numeric.N_Matsubara-1)*pi/inverse_temp) at n=$(numeric.N_Matsubara)")
         GreenFtn = GreenFtn[1:numeric.N_Matsubara]
@@ -663,8 +668,8 @@ end
           ,Hermitian(moments[2])/Normalization
           ,Hermitian(moments[3])/Normalization
           ,Hermitian(moments[4])/Normalization
-          ,zeros(moments[1])
-          ,zeros(moments[1])
+          ,zero(moments[1])
+          ,zero(moments[1])
       )
       return temp
   end
@@ -765,7 +770,7 @@ function smoothKernel(numeric::strNumeric, data_info::data_info_, dSegment)
 #   SMOOTH /= 2.0
 #   SMOOTH = Hermitian(SMOOTH)
 
-#   SMOOTH = eye(SMOOTH)
+#   SMOOTH = one(SMOOTH)
    return SMOOTH
 end
 
@@ -1077,7 +1082,7 @@ function gaussianPotential!(imagFreqFtn::strImagFreqFtn, realFreqFtn::strRealFre
 
 
         for w=1:Egrid
-            Aw[w] = Hermitian(expm(Hermitian( - (realFreqFtn.H_extern[w] -chempot *eye(realFreqFtn.H_extern[w]))  )))
+            Aw[w] = Hermitian(expm(Hermitian( - (realFreqFtn.H_extern[w] -chempot *one(realFreqFtn.H_extern[w]))  )))
             local_trace_value[w] = tr(Aw[w])
         end
         #sum_rule
