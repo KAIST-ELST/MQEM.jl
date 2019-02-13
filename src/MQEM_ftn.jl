@@ -115,11 +115,10 @@ end
 	  Gmoment = [ imagFreqFtn.moments1, imagFreqFtn.moments2, imagFreqFtn.moments3 ]
 	  Hamiltonian_out  = -auxiliary_inverse_temp * ( (kernel.Kernel_dagger)*(imagFreqFtn.GreenFtn) ) ;
  	  Hamiltonian_out += -auxiliary_inverse_temp * ( (kernel.moment_dagger)*(kernel.gamma*Gmoment) ) ;
-
       # d(G-KA)^2 =  -K'(G - KA) , second term,i.e. K'K,  = interaction term,
 
       for w=1:Egrid
-          Hamiltonian_out[w] -=  log.( (Spectral_default_model[w]) + 1e-15*one(Spectral_default_model[w]) )
+          Hamiltonian_out[w] -=  log( (Spectral_default_model[w]) + 1e-15*one(Spectral_default_model[w]) )
           Hamiltonian_out[w] +=  Hamiltonian_out[w]'    ;
       end
       Hamiltonian_out *=      (0.5);
