@@ -1,32 +1,36 @@
 #workDirect = "/home/users1/jhsim/Dropbox/src/TB_DMFT/TB+DMFT14.3/add_on_script/mem_matrix_julia/DataMaker/T_40"
-inputFile = "4626_0.5_noise2.csv"
+inputFile = "Giw_Lorentzian.full.dat2"
 
-NumOrbit = 1
+NumOrbit = 2
 num_of_subblock = 1
-N_Matsubara  =  320
+N_Matsubara  =  1000
 inverse_temp =  100.0
+
 
 EwinOuterRight =   15.0
 EwinInnerRight =   10.0
 EwinInnerLeft =   -10.0
 EwinOuterLeft =   -15.0
-coreWindow   = 0
-coreDense    = 1
+coreWindow   = 4
+coreDense    = 2
 
-Egrid =  300
+default_model = "f"
+#Asymtotic_HighFreq  = false
+Egrid =  100
 
 offDiagonal = true     #true, false
-auxiliary_inverse_temp_range = [1e-3, 1000.0]
-auxTempRenomalFactorInitial = 1.01
+auxiliary_inverse_temp_range = [1e-3, 5000.0]
+auxTempRenomalFactorInitial = 1.2
 
-NumIter = 20000
+NumIter = 15000
 mixingInitial =  0.05
 mixing_max =     0.1
-mixing_min =     1e-7
+mixing_min =     1e-6
 pulay_mixing_start =       1
 pulay_mixing_step =        1    ## negative for stable, simple-mixing-like behavior
-pulay_mixing_history =     20     ##1 forsimpleMixing
+pulay_mixing_history =     5     ##1 forsimpleMixing
 
+option = 2
 
 #
 #[test1]
