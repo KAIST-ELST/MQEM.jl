@@ -329,7 +329,7 @@ for cluster=start_cluster:num_of_subblock-1
     ##################################################################################
     #KK relation
     Aw_RealPart = KK_relation( realFreqFtn.Aw, numeric)
-    write_results(phyParm.NumSubOrbit, fname_out, fname_contniuedSpectrum, realFreqFtn.Aw, numeric.ERealAxis, imagFreqFtn.Normalization, imagFreqFtn.GreenConst, Aw_RealPart, numeric.Egrid)
+    write_results(phyParm.NumSubOrbit, fname_out, fname_contniuedSpectrum, fname_reproduce ,kernel, realFreqFtn.Aw, numeric.ERealAxis, imagFreqFtn.Normalization, imagFreqFtn.GreenConst, Aw_RealPart, numeric.Egrid,  data_info.inverse_temp)
 
     for Exchangecluster=cluster+1:num_of_subblock-1
       for i = 1:phyParm.NumSubOrbit

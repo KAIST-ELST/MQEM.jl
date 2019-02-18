@@ -251,27 +251,28 @@ end
 
             if (  criteria_Aw < 1e-6*NumSubOrbit     )
   	          E_in = get_total_energy(imagFreqFtn, Aw_in, kernel, numeric)
-  	          E_out = get_total_energy(imagFreqFtn, Aw_out, kernel, numeric)
-  		        resd_totE =  abs(E_in-E_out)
-              if (resd_totE < 1e-10 )
-        			  converg = true
-        			  realFreqFtn.Hw[:] = Hamiltonian_in
-        			  break
-              end
-        elseif (   ( (iter > numeric.NumIter &&  criteria_Aw > criteria_Aw_prev100) || criteria_Aw > criteria_Aw_prev100*1.5 )    )
-	          E_in = get_total_energy(imagFreqFtn, Aw_in, kernel, numeric)
-	          E_out = get_total_energy(imagFreqFtn, Aw_out, kernel, numeric)
-            resd_totE =  abs(E_in-E_out)
-            converg = false
-            break
-          end
-          mixing_local = find_optimal_mixing_weight!(mixing_local, criteria_Aw, criteria_Aw_prev100, mixing_parm)
-              criteria_Aw_prev100 = criteria_Aw
-      end
-          #Prepare next iteration
-          Aw_in = pulayMixing!(iter, mixing_local, Aw_in,   Aw_out-Aw_in, numeric.dERealAxis, MixingInformation)
-#          Aw_in = pulayMixing!(iter, mixing_local, Aw_in,   Aw_out-Aw_in, kernel, MixingInformation)
-          iter += 1
+                  E_out = get_total_energy(imagFreqFtn, Aw_out, kernel, numeric)
+                  resd_totE =  abs(E_in-E_out)
+                  if (resd_totE < 1e-10 )
+                      converg = true
+                      realFreqFtn.Hw[:] = Hamiltonian_in
+                      break
+                  end
+            elseif (   ( (iter > numeric.NumIter &&  criteria_Aw > criteria_Aw_prev100) || criteria_Aw > criteria_Aw_prev100*1.5 )    )
+                   E_in = get_total_energy(imagFreqFtn, Aw_in, kernel, numeric)
+                   E_out = get_total_energy(imagFreqFtn, Aw_out, kernel, numeric)
+                   resd_totE =  abs(E_in-E_out)
+                   converg = false
+		   println("iter:$(iter) criteria_Aw:$(criteria_Aw) criteria_Aw_prev100:$(criteria_Aw_prev100) resd_totE:$(resd_totE)")
+                   break
+             end  # (elseif)
+             mixing_local = find_optimal_mixing_weight!(mixing_local, criteria_Aw, criteria_Aw_prev100, mixing_parm)
+             criteria_Aw_prev100 = criteria_Aw
+        end # (iter%20)
+        #Prepare next iteration
+        Aw_in = pulayMixing!(iter, mixing_local, Aw_in,   Aw_out-Aw_in, numeric.dERealAxis, MixingInformation)
+#        Aw_in = pulayMixing!(iter, mixing_local, Aw_in,   Aw_out-Aw_in, kernel, MixingInformation)
+        iter += 1
       end #end of iteration
       return ( Aw_in  ,   converg,   criteria_Aw, resd_totE, iter)
   end
@@ -333,9 +334,10 @@ end
             auxiliary_inverse_temp = 0.01 * (auxiliary_inverse_temp) + 0.99* (auxiliary_inverse_temp_prev);
             (Aw, converg,   normAwRD, resd_totE, iter) =
                     Aw_Iteration(realFreqFtn, imagFreqFtn,kernel, auxiliary_inverse_temp, NumSubOrbit, numeric,mixing, mixing_parm)
-            if trial==10 break end
+		    println(trial)
+            if (trial==10 || auxiliary_inverse_temp==auxiliary_inverse_temp_prev) break end
           end
-          if trial==10
+          if (trial==10 || auxiliary_inverse_temp==auxiliary_inverse_temp_prev)
 	     println("WARNNIG: spectral function is not converged!")
 	     break
 	  end
@@ -351,6 +353,8 @@ end
 
 
 
+	@printf("%.1f \t alpha_inv: %.5f\n  ",
+	progress, auxiliary_inverse_temp)
 
 
 	  if converg &&  progress > print_stdout
@@ -680,7 +684,7 @@ end
   function KK_relation( Aw::Array{Array{ComplexF64,2}},  numeric::strNumeric )
     NumSubOrbit = size(Aw[1])[1]
     delta = 1e-10
-    Aw_RealPart = Array{Array{ComplexF64,2}}(numeric.Egrid)
+    Aw_RealPart = Array{Array{ComplexF64,2}}(undef, numeric.Egrid)
     for jj = 1:size(Aw_RealPart)[1]
       Aw_RealPart[jj]= zeros(ComplexF64, NumSubOrbit,NumSubOrbit)
     end
