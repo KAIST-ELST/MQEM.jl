@@ -354,7 +354,7 @@ end
 
 
 #	@printf("%.1f \t alpha_inv: %.5f\n  ",
-	progress, auxiliary_inverse_temp)
+#	progress, auxiliary_inverse_temp)
 
 
 	  if converg &&  progress > print_stdout
