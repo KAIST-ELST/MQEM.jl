@@ -81,7 +81,7 @@ end
          E = numeric.ERealAxis[w]
          if(shape == "G")
            Spectral_default_model[w] = Hermitian( (Green_Inf *( exp.(-0.5 *((E-center)/eta)^2) + (1e-30)    ) ) )
-	          trace_model[w] = tr(Spectral_default_model[w])
+	   trace_model[w] = tr(Spectral_default_model[w])
          elseif(shape == "L")
            Spectral_default_model[w] = (Green_Inf * 1/( (E-center)^2 + eta^2) +1e-30*(one(Green_Inf)) )
 	         trace_model[w] = tr(Spectral_default_model[w])
@@ -179,7 +179,7 @@ end
 
           #Construct A(w) from input H
           for  w=1:numeric.Egrid
-	      Aw_out[w] = Hermitian(exp.(Hermitian( -Hamiltonian[w]) ))
+	      Aw_out[w] = Hermitian(exp(Hermitian( -Hamiltonian[w]) ))
 	      local_trace_value[w] = tr(Aw_out[w])
           end
           #sum_rule
@@ -334,7 +334,7 @@ end
             auxiliary_inverse_temp = 0.01 * (auxiliary_inverse_temp) + 0.99* (auxiliary_inverse_temp_prev);
             (Aw, converg,   normAwRD, resd_totE, iter) =
                     Aw_Iteration(realFreqFtn, imagFreqFtn,kernel, auxiliary_inverse_temp, NumSubOrbit, numeric,mixing, mixing_parm)
-		    println(trial)
+#		    println(trial)
             if (trial==10 || auxiliary_inverse_temp==auxiliary_inverse_temp_prev) break end
           end
           if (trial==10 || auxiliary_inverse_temp==auxiliary_inverse_temp_prev)
@@ -353,7 +353,7 @@ end
 
 
 
-	@printf("%.1f \t alpha_inv: %.5f\n  ",
+#	@printf("%.1f \t alpha_inv: %.5f\n  ",
 	progress, auxiliary_inverse_temp)
 
 
