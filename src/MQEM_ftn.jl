@@ -351,25 +351,6 @@ end
           push!(logAlpha, log(auxiliary_inverse_temp))
 	  progress = (auxiliary_inverse_temp - start_temperature)/(end_temperature-start_temperature) *100
 
-
-
-#	@printf("%.1f \t alpha_inv: %.5f\n  ",
-#	progress, auxiliary_inverse_temp)
-
-
-	  if converg &&  progress > print_stdout
-	           @printf("%.1f \t alpha_inv: %.5f\n  ",
-		   progress, auxiliary_inverse_temp)
-                   if write_information
-                       information_file=open("$(workDirect)/information.out","a")
-                       write(information_file,"$auxiliary_inverse_temp\t\t$(Energy) ; $(iter)\t$(mixing)\t$(auxTempRenomalFactor)   \n" )
-                       close(information_file)
-               	       s= @sprintf "%.5f" auxiliary_inverse_temp
-                       write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw, kernel, fname_out,  "")
-         	   end
-		   print_stdout += 2
-	  end
-
 	  tempE   = deepcopy(logEnergy)
 	  tempAlp = deepcopy(logAlpha)
 	  a = (logEnergy[end]-logEnergy[1])/(logAlpha[end]-logAlpha[1])
@@ -379,12 +360,55 @@ end
 	  end
 	  integrated_chi2_alpha = sum(tempE)
 
-          if(progress >= 100 &&  integrated_chi2_alpha > integrated_chi2_alpha_prev )
+
+	  if  progress > print_stdout
+	           @printf("%.1f \t alpha_inv: %.5f converg: %.5f\n",
+		   progress, auxiliary_inverse_temp, integrated_chi2_alpha)
+                   if write_information
+#               	       s= @sprintf "%.5f" auxiliary_inverse_temp
+                       write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw, kernel, fname_out,  "")
+         	   end
+		   print_stdout += 2
+	  end
+          information_file=open("$(workDirect)/information.out","a")
+          write(information_file,"$auxiliary_inverse_temp\t\t$(Energy) ; $(iter)\t$(mixing)\t$(auxTempRenomalFactor)   \n" )
+          close(information_file)   
+
+          if(progress >= 100 &&  integrated_chi2_alpha >= integrated_chi2_alpha_prev )
                   end_temperature *= 2
-          end
-          if  auxiliary_inverse_temp  >  end_temperature || time()-search_start > 600.0
+		  print_stdout =  floor(Int,(auxiliary_inverse_temp - start_temperature)/(end_temperature-start_temperature) *100 )
+		  end
+
+	  if converg && integrated_chi2_alpha < integrated_chi2_alpha_prev 
+	          println("We have optimal alpha: $(auxiliary_inverse_temp) \n $(integrated_chi2_alpha_prev), $(integrated_chi2_alpha)")
+      	 	  break
+          elseif  time()-search_start > 600.0   && trial >=2
+               println(time()-search_start)
                break
-          end
+	  end
+	  if converg
+	    integrated_chi2_alpha_prev = integrated_chi2_alpha
+	  end
+#	  if converg &&  progress > print_stdout
+#	           @printf("%.1f \t alpha_inv: %.5f converg: %.5f\n",
+#		   progress, auxiliary_inverse_temp, integrated_chi2_alpha)
+#                   if write_information
+#                       information_file=open("$(workDirect)/information.out","a")
+#                       write(information_file,"$auxiliary_inverse_temp\t\t$(Energy) ; $(iter)\t$(mixing)\t$(auxTempRenomalFactor)   \n" )
+#                       close(information_file)
+#               	       s= @sprintf "%.5f" auxiliary_inverse_temp
+#                       write_spectral_ftn(NumSubOrbit, imagFreqFtn.Normalization, numeric, Aw, kernel, fname_out,  "")
+#         	   end
+#		   print_stdout += 2
+#	  end
+#
+#
+#          if(progress >= 100 &&  integrated_chi2_alpha > integrated_chi2_alpha_prev )
+#                  end_temperature *= 2
+#          end
+#          if  auxiliary_inverse_temp  >  end_temperature || time()-search_start > 600.0
+#               break
+#          end
       end #while_ (auxiliary_inverse_temp  <=  end_temperature)
 
 #      return  logEnergy,  logAlpha, end_temperature
@@ -1120,7 +1144,7 @@ function gaussianPotential!(imagFreqFtn::strImagFreqFtn, realFreqFtn::strRealFre
 
     end
     # =#
-    result=nlsolve(getABC2, xinit, xtol = 1e-5, ftol=1e-10 )
+    result=nlsolve(getABC2, xinit, xtol = 1e-6, ftol=1e-10 )
     xfinal = result.zero
 
 

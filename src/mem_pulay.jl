@@ -9,6 +9,7 @@ function matrixFtn_innerProduct( Aw::Array{Array{ComplexF64,2}} , Bw::Array{Arra
             normVector_temp = Array{ComplexF64}(undef,lengthOfVector)
             for w=1:lengthOfVector
 		    normVector_temp[w] = tr( ( Aw[w]') * Bw[w] )  * weight[w]
+#		    normVector_temp[w] = tr( ( Aw[w]') * Bw[w] )  
             end
 #	    rest = dot(kernel.moment[1,:],normVector_temp)
             rest=sum(normVector_temp)
@@ -75,13 +76,20 @@ function pulayMixing!(iter::Int64, mixing::Float64,
         #To obtain best guessing  Aw
         if (iter%abs(MixInfo.mixingStep)==0) &&  MixInfo.mixingMemory>1  &&
             iter >= MixInfo.mixingStart + MixInfo.mixingMemory
-            if det(temp) != 0
+            if det((temp)) != 0.0
                #Pulay interpol
                #Linear Solver
 #               rhs=zeros(MixInfo.mixingMemory+1)
                rhs=zeros(dim)
                rhs[1]=-1
-               alpha = \(temp,rhs )
+
+#temp=	(transpose(temp) + temp)/2.0
+#	println("\n\n",((temp)) )
+#	println(det((temp)) )
+#	println("\n",(Symmetric(temp)) )
+#	println(det(Symmetric(temp)) )
+#
+               alpha = \( (temp),rhs )
                alpha = alpha[2:end]
                FtnOpt = sum(alpha .* MixInfo.inputHistory[1:dim-1])
                FtnOptResd = sum(alpha.*MixInfo.residHistory[1:dim-1])
@@ -94,10 +102,11 @@ function pulayMixing!(iter::Int64, mixing::Float64,
                else  FtnMixed =                                                  FtnOpt + mixing * FtnOptResd
                end
                MixInfo.previousMixing = "pulay"
-             elseif(det(temp) == 0 )
+             else
 		println("Warning: PulayMixing,linear dependence arise at iter=$(iter)")
                 #Simple mixing
-                FtnMixed = FtnIn + mixing*FtnResid
+#                FtnMixed = FtnIn + mixing*FtnResid
+                FtnMixed = FtnIn + 1.0*FtnResid
                 MixInfo.previousMixing = "simple"
 	     end
         else
