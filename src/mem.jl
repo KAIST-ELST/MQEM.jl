@@ -23,7 +23,7 @@ run(`touch mqem.input.toml`)
 input_toml = TOML.parsefile("mqem.input.toml")
 function input_ftn(var::String)
   if haskey(input_toml, var)
-     println("Input : $(var):",input_toml[var] )
+     println("$(var) = ",input_toml[var] )
     return input_toml[var]
   else
      println("Input error: ",var )
@@ -32,10 +32,10 @@ function input_ftn(var::String)
 end
 function input_ftn(var::String, val)
   if haskey(input_toml, var)
-     println("Input : $(var):",input_toml[var] )
+     println("$(var) = ",input_toml[var] )
     return input_toml[var]
   else
-     println("Input default: $(var):",val )
+     println("$(var) = ",val )
     return val
   end
 end
@@ -43,7 +43,7 @@ function input_extern(var::String, extern_file::String)
   extern_read = readdlm(extern_file)
   for line =1:size(extern_read)[1]
     if extern_read[line,1] == var
-      println("Input : $(var):", extern_read[line,3] )
+      println("$(var) = ", extern_read[line,3] )
       return extern_read[line,3]
     end
   end
@@ -97,7 +97,7 @@ real_freq_grid_info= real_freq_grid_info_(EwinOuterRight,
 					   EgridInner
 					   )
 
-default_model  = input_ftn("default_model" ,"f")
+default_model  = input_ftn("default_model" ,"g_mat") # f, g, g_mat
 Model_range_right = input_ftn("Model_right",EwinOuterRight)
 Model_range_left  = input_ftn("Model_left" ,EwinOuterLeft)
 auxiliary_inverse_temp_range = input_ftn("auxiliary_inverse_temp_range", [1e-2, 1.0] )
@@ -118,7 +118,7 @@ mixing_max           = input_ftn("mixing_max",           0.3)
 mixing_min           = input_ftn("mixing_min",           1e-4)
 pulay_mixing_start   = input_ftn("pulay_mixing_start",   1)
 pulay_mixing_step    = input_ftn("pulay_mixing_step",    1)
-pulay_mixing_history = input_ftn("pulay_mixing_history", 5)
+pulay_mixing_history = input_ftn("pulay_mixing_history", 7)
 
 mixing_parm= mixing_parm_(NumIter,
 			   mixingInitial,
@@ -236,11 +236,11 @@ for cluster=start_cluster:num_of_subblock-1
         end
     end
 
-
     GreenConstFull =  zeros(ComplexF64, NumFullOrbit,NumFullOrbit)
     (imagFreqFtn) = read_matsubara_GreenFtn!( data_info,  numeric, startOrbit, phyParm.NumSubOrbit)
     kernel = construct_Kernel_inCubicSpline(numeric, data_info)
     sigmaFlat = (EwinInnerRight - EwinInnerLeft)
+
 
     sigma = min(( tr(imagFreqFtn.moments3)-tr(imagFreqFtn.moments2)^2),  ((EwinOuterRight - EwinOuterLeft)/4)^2)
     if sigma>0
@@ -261,8 +261,8 @@ for cluster=start_cluster:num_of_subblock-1
 				     tr(imagFreqFtn.moments2), tr(imagFreqFtn.moments3)/phyParm.NumSubOrbit,"G", kernel)
 
     elseif(default_model=="g_mat")  #gaussian default_model
-      Ainit= Hermitian(-1.0/(2*sigma^2) *eye(imagFreqFtn.moments2))
-      Binit= Hermitian(-( tr(imagFreqFtn.moments2) / sigma^2)*eye(imagFreqFtn.moments2))
+      Ainit= Hermitian(-1.0/(2*sigma^2) *one(imagFreqFtn.moments2))
+      Binit= Hermitian(-( tr(imagFreqFtn.moments2) / sigma^2)*one(imagFreqFtn.moments2))
       s= 3*phyParm.NumSubOrbit +2*3*(div(phyParm.NumSubOrbit*(phyParm.NumSubOrbit-1),2)) -1     # -1 come from the fact that C=tr less
         # First term = diagonal for A,B,C
         # sencdterm = real, imag foa off-diagoal of the  A,B,C

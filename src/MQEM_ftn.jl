@@ -1018,7 +1018,7 @@ function p2ABC(p::Array{Float64},dim::Int64)
     for i=1:dim-1
         C[i,i]=p[2*dim+i]
     end
-    C-=tr(C)/dim
+    C.-=tr(C)/dim
 
      s=div(dim*(dim-1),2)
      offd=3*dim-1
@@ -1074,9 +1074,9 @@ function gaussianPotential!(imagFreqFtn::strImagFreqFtn, realFreqFtn::strRealFre
     function getABC2(F::Array{Float64}, p::Array{Float64})
         (A,B,C)=p2ABC(p,dim)
 
-        E0=Array{Float64}(numeric.Egrid)
+        E0=Array{Float64}(undef, numeric.Egrid)
 
-        local_trace_value =  Array{Float64}(Egrid)
+        local_trace_value =  Array{Float64}(undef, Egrid)
         for w=1:Egrid
             realFreqFtn.H_extern[w] =  - Hermitian( A * numeric.ERealAxis[w]^2 + B* numeric.ERealAxis[w]+ C  )
             E0[w]=eigmin(Hermitian(realFreqFtn.H_extern[w]))
@@ -1085,7 +1085,7 @@ function gaussianPotential!(imagFreqFtn::strImagFreqFtn, realFreqFtn::strRealFre
 
 
         for w=1:Egrid
-            Aw[w] = Hermitian(expm(Hermitian( - (realFreqFtn.H_extern[w] -chempot *one(realFreqFtn.H_extern[w]))  )))
+            Aw[w] = Hermitian(exp(Hermitian( - (realFreqFtn.H_extern[w] -chempot *one(realFreqFtn.H_extern[w]))  )))
             local_trace_value[w] = tr(Aw[w])
         end
         #sum_rule
