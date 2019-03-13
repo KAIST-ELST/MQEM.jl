@@ -52,11 +52,11 @@ function input_extern(var::String, extern_file::String)
 end
 ####################################################
 workDirect      =     input_ftn("workDirect", pwd())
-inputFile       =     input_ftn("inputFile", "Sw_SOLVER.full.dat")
+inputFile       =     input_ftn("inputFile", ARGS[1])
 outputFileUseinputFile = input_ftn("outputFileUseinputFile",false)
 inverse_temp        = input_ftn("inverse_temp" ,-1.0            )
 if inverse_temp <0
-inverse_temp =input_extern("BETA", "../../input.solver")
+inverse_temp =input_extern("BETA", ARGS[2])
 end
 
 (Norb_file, NMat_file ) = find_default_parm( workDirect, inputFile, inverse_temp)

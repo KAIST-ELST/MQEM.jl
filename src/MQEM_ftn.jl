@@ -335,9 +335,9 @@ end
             (Aw, converg,   normAwRD, resd_totE, iter) =
                     Aw_Iteration(realFreqFtn, imagFreqFtn,kernel, auxiliary_inverse_temp, NumSubOrbit, numeric,mixing, mixing_parm)
 #		    println(trial)
-            if (trial==10 || auxiliary_inverse_temp==auxiliary_inverse_temp_prev) break end
+            if (trial==10 ) break end
           end
-          if (trial==10 || auxiliary_inverse_temp==auxiliary_inverse_temp_prev)
+          if (trial==10 )
 	     println("WARNNIG: spectral function is not converged!")
 	     break
 	  end

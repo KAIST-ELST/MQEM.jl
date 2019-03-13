@@ -69,17 +69,19 @@ function pulayMixing!(iter::Int64, mixing::Float64,
 
         dim = min(MixInfo.mixingMemory+1, iter-MixInfo.mixingStart+1);
         temp = MixInfo.PulayMatrix[1:dim, 1:dim];
+#	println("\n", temp)
+#	println(det(Symmetric(temp)) )
 
         #To obtain best guessing  Aw
         if (iter%abs(MixInfo.mixingStep)==0) &&  MixInfo.mixingMemory>1  &&
             iter >= MixInfo.mixingStart + MixInfo.mixingMemory
-            if det(Symmetric(temp)) != 0
+            if det(temp) != 0
                #Pulay interpol
                #Linear Solver
 #               rhs=zeros(MixInfo.mixingMemory+1)
                rhs=zeros(dim)
                rhs[1]=-1
-               alpha = \(Symmetric(temp),rhs )
+               alpha = \(temp,rhs )
                alpha = alpha[2:end]
                FtnOpt = sum(alpha .* MixInfo.inputHistory[1:dim-1])
                FtnOptResd = sum(alpha.*MixInfo.residHistory[1:dim-1])
@@ -92,7 +94,7 @@ function pulayMixing!(iter::Int64, mixing::Float64,
                else  FtnMixed =                                                  FtnOpt + mixing * FtnOptResd
                end
                MixInfo.previousMixing = "pulay"
-             elseif(det(Symmetric(temp)) == 0 )
+             elseif(det(temp) == 0 )
 		println("Warning: PulayMixing,linear dependence arise at iter=$(iter)")
                 #Simple mixing
                 FtnMixed = FtnIn + mixing*FtnResid
