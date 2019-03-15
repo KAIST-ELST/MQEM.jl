@@ -379,10 +379,10 @@ end
 		  print_stdout =  floor(Int,(auxiliary_inverse_temp - start_temperature)/(end_temperature-start_temperature) *100 )
 		  end
 
-	  if converg && integrated_chi2_alpha < integrated_chi2_alpha_prev 
+	  if converg && integrated_chi2_alpha < integrated_chi2_alpha_prev  && trial == 0
 	          println("We have optimal alpha: $(auxiliary_inverse_temp) \n $(integrated_chi2_alpha_prev), $(integrated_chi2_alpha)")
-      	 	  break
-          elseif  time()-search_start > 600.0   && trial >=2
+        	  break
+          elseif  time()-search_start > 1200.0   && trial >=2
                println(time()-search_start)
                break
 	  end
