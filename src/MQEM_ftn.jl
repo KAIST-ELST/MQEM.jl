@@ -9,7 +9,6 @@ using LsqFit
 using LinearAlgebra
 using Printf
 using DelimitedFiles  #readdlm
-
 using Statistics  # var
 
 global blur_width = 0.5;

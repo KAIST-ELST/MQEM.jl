@@ -8,14 +8,11 @@
 
 
 
-using LsqFit  # add https://github.com/JuliaNLSolvers/LsqFit.jl
+using  MQEM
+using  MQEM.LsqFit  # add https://github.com/JuliaNLSolvers/LsqFit.jl
 import TOML   # add https://github.com/wildart/TOML.jl.git
-
-
-
-using MQEM
-using DelimitedFiles
-using LinearAlgebra
+using  MQEM.DelimitedFiles
+using  MQEM.LinearAlgebra
 
 #input  param
 
