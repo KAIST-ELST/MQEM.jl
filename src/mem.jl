@@ -1,6 +1,5 @@
 # fit to find optimal alpha
-# https://github.com/JuliaNLSolvers/LsqFit.jl
-#Pkg.clone("https://github.com/wildart/TOML.jl.git")
+
 ###########################################
 # Jae-Hoon Sim, KAIST 2018.01.
 #2018.07.13
@@ -9,21 +8,20 @@
 
 
 
-using LsqFit
-import TOML
-
-
-
-using MQEM
-
+using  MQEM
+using  MQEM.LsqFit  # add https://github.com/JuliaNLSolvers/LsqFit.jl
+#import TOML   # add https://github.com/wildart/TOML.jl.git
+import Pkg.TOML   # add https://github.com/wildart/TOML.jl.git
+using  MQEM.DelimitedFiles
+using  MQEM.LinearAlgebra
 
 #input  param
 
 run(`touch mqem.input.toml`)
 input_toml = TOML.parsefile("mqem.input.toml")
 function input_ftn(var::String)
-  if haskey(input_toml, var) 
-     println("Input : $(var) = ",input_toml[var] )
+  if haskey(input_toml, var)
+     println("$(var) = ",input_toml[var] )
     return input_toml[var]
   else
      println("Input error: ",var )
@@ -31,11 +29,11 @@ function input_ftn(var::String)
   end
 end
 function input_ftn(var::String, val)
-  if haskey(input_toml, var) 
-     println("Input : $(var) = ",input_toml[var] )
+  if haskey(input_toml, var)
+     println("$(var) = ",input_toml[var] )
     return input_toml[var]
   else
-     println("Input default: $(var) = ",val )
+     println("$(var) = ",val )
     return val
   end
 end
@@ -43,7 +41,7 @@ function input_extern(var::String, extern_file::String)
   extern_read = readdlm(extern_file)
   for line =1:size(extern_read)[1]
     if extern_read[line,1] == var
-      println("Input : $(var) = ", extern_read[line,3] )
+      println("$(var) = ", extern_read[line,3] )
       return extern_read[line,3]
     end
   end
@@ -52,10 +50,11 @@ function input_extern(var::String, extern_file::String)
 end
 ####################################################
 workDirect      =     input_ftn("workDirect", pwd())
-inputFile       =     input_ftn("inputFile", "Sw_SOLVER.full.dat")
+inputFile       =     input_ftn("inputFile", ARGS[1])
+outputFileUseinputFile = input_ftn("outputFileUseinputFile",false)
 inverse_temp        = input_ftn("inverse_temp" ,-1.0            )
 if inverse_temp <0
-inverse_temp =input_extern("BETA", "../../input.solver")
+inverse_temp =input_extern("BETA", ARGS[2])
 end
 
 (Norb_file, NMat_file ) = find_default_parm( workDirect, inputFile, inverse_temp)
@@ -96,7 +95,7 @@ real_freq_grid_info= real_freq_grid_info_(EwinOuterRight,
 					   EgridInner
 					   )
 
-default_model  = input_ftn("default_model" ,"f") # g, g_mat
+default_model  = input_ftn("default_model" ,"g_mat") # f, g, g_mat
 Model_range_right = input_ftn("Model_right",EwinOuterRight)
 Model_range_left  = input_ftn("Model_left" ,EwinOuterLeft)
 auxiliary_inverse_temp_range = input_ftn("auxiliary_inverse_temp_range", [1e-2, 1.0] )
@@ -117,7 +116,7 @@ mixing_max           = input_ftn("mixing_max",           0.3)
 mixing_min           = input_ftn("mixing_min",           1e-4)
 pulay_mixing_start   = input_ftn("pulay_mixing_start",   1)
 pulay_mixing_step    = input_ftn("pulay_mixing_step",    1)
-pulay_mixing_history = input_ftn("pulay_mixing_history", 5)
+pulay_mixing_history = input_ftn("pulay_mixing_history", 7)
 
 mixing_parm= mixing_parm_(NumIter,
 			   mixingInitial,
@@ -133,9 +132,14 @@ inputInfo = strInputInfo(data_info,
 			 mem_fit_parm,
 			 mixing_parm
 			 )
+outputPrefix = "realFreq_Sw.dat_";
+if outputFileUseinputFile
+ outputPrefix = inputFile*"_realFreq_Sw.dat_"
+end
+println("outputPrefix ",outputPrefix)
 
 #############################################################################################
-# (Start) Initialize real space variables 
+# (Start) Initialize real space variables
 #############################################################################################
 
 
@@ -169,20 +173,20 @@ phyParm = strPhyParm(
 
 
 realFreqFtn  = strRealFreqFtn(
-  Array{Array{Complex128,2}}(numeric.Egrid)
- ,Array{Array{Complex128,2}}(numeric.Egrid)
- ,Array{Array{Complex128,2}}(numeric.Egrid)
- ,Array{Array{Complex128,2}}(numeric.Egrid)
- ,Array{Array{Complex128,2}}(numeric.Egrid)
+  Array{Array{ComplexF64,2}}(undef,numeric.Egrid)
+ ,Array{Array{ComplexF64,2}}(undef,numeric.Egrid)
+ ,Array{Array{ComplexF64,2}}(undef,numeric.Egrid)
+ ,Array{Array{ComplexF64,2}}(undef,numeric.Egrid)
+ ,Array{Array{ComplexF64,2}}(undef,numeric.Egrid)
 )
 for w=1:numeric.Egrid
-   realFreqFtn.H_extern[w] = Hermitian(zeros(Complex128, phyParm.NumSubOrbit, phyParm.NumSubOrbit))
+   realFreqFtn.H_extern[w] = Hermitian(zeros(ComplexF64, phyParm.NumSubOrbit, phyParm.NumSubOrbit))
 end
 
 
 
 #############################################################################################
-# (end) Initialize variables 
+# (end) Initialize variables
 #############################################################################################
 
 #etc...
@@ -209,83 +213,84 @@ println("sub-space dim=$(phyParm.NumSubOrbit)")
 
 ####start main
 f=open("$(workDirect)/information.out","w");write(f,"\n" );close(f)
+
+
+println("default_model: $(default_model)")
 for cluster=start_cluster:num_of_subblock-1
-    global startOrbit = phyParm.NumSubOrbit*cluster
+    startOrbit = phyParm.NumSubOrbit*cluster
     println("Block = $(startOrbit)")
-    
+
     # =#
     #file
-#    global fname = "$(workDirect)/$(inputFile)"
-    global fname_out = Array{String}(phyParm.NumSubOrbit,phyParm.NumSubOrbit)
-    global fname_contniuedSpectrum = Array{String}(phyParm.NumSubOrbit,phyParm.NumSubOrbit)
-    global fname_reproduce = Array{String}(phyParm.NumSubOrbit,phyParm.NumSubOrbit)
+    fname_out = Array{String}(undef,phyParm.NumSubOrbit,phyParm.NumSubOrbit)
+    fname_contniuedSpectrum = Array{String}(undef,phyParm.NumSubOrbit,phyParm.NumSubOrbit)
+    fname_reproduce = Array{String}(undef,phyParm.NumSubOrbit,phyParm.NumSubOrbit)
+
     for i = 0:phyParm.NumSubOrbit-1
         for j=0:phyParm.NumSubOrbit-1
             fname_out[i+1,j+1] = "$(workDirect)/spectral_function_$(i+startOrbit)_$(j+startOrbit).dat"
-      fname_reproduce[i+1,j+1] = "$(workDirect)/reproduce_$(i+startOrbit)_$(j+startOrbit).out"
-      fname_contniuedSpectrum[i+1,j+1] = "$(workDirect)/realFreq_Sw.dat_$(i+startOrbit+1)_$(j+startOrbit+1)"
+            fname_reproduce[i+1,j+1] = "$(workDirect)/reproduce_$(i+startOrbit)_$(j+startOrbit).out"
+            fname_contniuedSpectrum[i+1,j+1] = "$(workDirect)/$(outputPrefix)$(i+startOrbit+1)_$(j+startOrbit+1)"
         end
     end
-    
-    
-    GreenConstFull =  zeros(Complex128, NumFullOrbit,NumFullOrbit)
+
+    GreenConstFull =  zeros(ComplexF64, NumFullOrbit,NumFullOrbit)
     (imagFreqFtn) = read_matsubara_GreenFtn!( data_info,  numeric, startOrbit, phyParm.NumSubOrbit)
     kernel = construct_Kernel_inCubicSpline(numeric, data_info)
     sigmaFlat = (EwinInnerRight - EwinInnerLeft)
-    
-    sigma = min(( trace(imagFreqFtn.moments3)-trace(imagFreqFtn.moments2)^2),  ((EwinOuterRight - EwinOuterLeft)/4)^2)
+
+
+    sigma = min(( tr(imagFreqFtn.moments3)-tr(imagFreqFtn.moments2)^2),  ((EwinOuterRight - EwinOuterLeft)/4)^2)
     if sigma>0
        sigma = sqrt(sigma)
-    else 
-      default_model = "f"
+    else
+      global default_model = "f"
     end
-    
-    
+
+
     if(default_model=="f") #flat default_model
-	    realFreqFtn.Spectral_default_model = 
-	    construct_model_spectrum(imagFreqFtn.moments1, numeric,inputInfo.mem_fit_parm,  phyParm.NumSubOrbit, 
-				     trace(imagFreqFtn.moments2), sigmaFlat,"F", kernel) 
+	    realFreqFtn.Spectral_default_model =
+	    construct_model_spectrum(imagFreqFtn.moments1, numeric,inputInfo.mem_fit_parm,  phyParm.NumSubOrbit,
+				     tr(imagFreqFtn.moments2), sigmaFlat,"F", kernel)
 
     elseif(default_model =="g")
 	    realFreqFtn.Spectral_default_model =
 	    construct_model_spectrum(imagFreqFtn.moments1, numeric,inputInfo.mem_fit_parm,  phyParm.NumSubOrbit,
-				     trace(imagFreqFtn.moments2), trace(imagFreqFtn.moments3)/phyParm.NumSubOrbit,"G", kernel)
+				     tr(imagFreqFtn.moments2), tr(imagFreqFtn.moments3)/phyParm.NumSubOrbit,"G", kernel)
 
     elseif(default_model=="g_mat")  #gaussian default_model
-      Ainit= Hermitian(-1.0/(2*sigma^2) *eye(imagFreqFtn.moments2))
-      Binit= Hermitian(-( trace(imagFreqFtn.moments2) / sigma^2)*eye(imagFreqFtn.moments2))
-      s= 3*phyParm.NumSubOrbit +2*3*(div(phyParm.NumSubOrbit*(phyParm.NumSubOrbit-1),2)) -1     # -1 come from the fact that C=trace less
+      Ainit= Hermitian(-1.0/(2*sigma^2) *one(imagFreqFtn.moments2))
+      Binit= Hermitian(-( tr(imagFreqFtn.moments2) / sigma^2)*one(imagFreqFtn.moments2))
+      s= 3*phyParm.NumSubOrbit +2*3*(div(phyParm.NumSubOrbit*(phyParm.NumSubOrbit-1),2)) -1     # -1 come from the fact that C=tr less
         # First term = diagonal for A,B,C
         # sencdterm = real, imag foa off-diagoal of the  A,B,C
-    
+
       xinit=zeros(Float64,s)
-    
+
       for i=1:phyParm.NumSubOrbit
            xinit[i]                     = Ainit[i,i]
            xinit[phyParm.NumSubOrbit+i] = Binit[i,i]
       end
-     
+
       xinit = gaussianPotential!(imagFreqFtn, realFreqFtn, kernel, numeric, xinit, realFreqFtn.Spectral_default_model)
       moments_rep  = kernel.moment * realFreqFtn.Spectral_default_model
-      println("Model: $(-real(trace(moments_rep[1])))/x +$(real(trace(moments_rep[3])))/x**3")
+      println("Model: $(-real(tr(moments_rep[1])))/x +$(real(tr(moments_rep[3])))/x**3")
     end
-    
+
     temp = deepcopy(realFreqFtn.Spectral_default_model)
     write_spectral_ftn(phyParm.NumSubOrbit, imagFreqFtn.Normalization, numeric, temp, kernel, fname_out, "_model")
     temp = []
-    
 
+    #Main part!########################################################################
+#    tic()
+       f=open("$(workDirect)/information.out","a");write(f,"\nsub_block$(cluster)\n" );close(f)
+    # #=
+    #  #= get aux. temperature spectrum
+      realFreqFtn.Aw = deepcopy(realFreqFtn.Spectral_default_model)
+      (logEnergy, logAlpha) = search_alpha( kernel,  realFreqFtn, imagFreqFtn,  numeric, mem_fit_parm, mixing_parm, true, fname_out, data_info, startOrbit)
+    #  =#
+#    toc()
 
- #Main part!########################################################################
- tic()
-    f=open("$(workDirect)/information.out","a");write(f,"\nsub_block$(cluster)\n" );close(f)
- # #=
- #  #= get aux. temperature spectrum
-   realFreqFtn.Aw = deepcopy(realFreqFtn.Spectral_default_model)
-   (logEnergy, logAlpha) = search_alpha( kernel,  realFreqFtn, imagFreqFtn,  numeric, mem_fit_parm, mixing_parm, true, fname_out, data_info, startOrbit)
- #  =#
- toc()
- 
 
 
 
@@ -303,7 +308,7 @@ for cluster=start_cluster:num_of_subblock-1
 #
 #
 # #  #= find optimal spectrum
-#   if alpha_optimal > mem_fit_parm.auxiliary_inverse_temp_range[2]   alpha_optimal=deepcopy(mem_fit_parm.auxiliary_inverse_temp_range[2]) 
+#   if alpha_optimal > mem_fit_parm.auxiliary_inverse_temp_range[2]   alpha_optimal=deepcopy(mem_fit_parm.auxiliary_inverse_temp_range[2])
 #   else
 #      mem_fit_parm.auxiliary_inverse_temp_range[2] = alpha_optimal
 #      realFreqFtn.Aw = deepcopy(realFreqFtn.Spectral_default_model)
@@ -315,28 +320,29 @@ for cluster=start_cluster:num_of_subblock-1
 #   println("Total_energy_at_optimal_alpha: $(energy_optimal) tail_contribution: $(energy_tail_optimal) with_grid $(numeric.Egrid) \n")
 # #  =#
 # toc()
-#    
-    
-    
-    
+#
+
+
+
     ##################################################################################
     #KK relation
     Aw_RealPart = KK_relation( realFreqFtn.Aw, numeric)
-    write_results(phyParm.NumSubOrbit, fname_out, fname_contniuedSpectrum, realFreqFtn.Aw, numeric.ERealAxis, imagFreqFtn.Normalization, imagFreqFtn.GreenConst, Aw_RealPart, numeric.Egrid)
-    
+    write_results(phyParm.NumSubOrbit, fname_out, fname_contniuedSpectrum, fname_reproduce ,kernel, realFreqFtn.Aw, numeric.ERealAxis, imagFreqFtn.Normalization, imagFreqFtn.GreenConst, Aw_RealPart, numeric.Egrid,  data_info.inverse_temp)
+
     for Exchangecluster=cluster+1:num_of_subblock-1
       for i = 1:phyParm.NumSubOrbit
           for j=1:phyParm.NumSubOrbit
               ifull=i+startOrbit;
               jfull= j+ (phyParm.NumSubOrbit*Exchangecluster)
-              f=open("$(workDirect)/realFreq_Sw.dat_$(ifull)_$(jfull)","w")
+
+              f=open("$(workDirect)/$(outputPrefix)$(ifull)_$(jfull)","w")
               for w=1:numeric.Egrid
                   E = numeric.ERealAxis[w]
                   Ftnij =  imagFreqFtn.GreenConstFull[ifull,jfull]
                   write(f, "$E $(real(Ftnij)) $(imag(Ftnij))\n")
               end
               close(f)
-              f=open("$(workDirect)/realFreq_Sw.dat_$(jfull)_$(ifull)","w")
+              f=open("$(workDirect)/$(outputPrefix)$(jfull)_$(ifull)","w")
               for w=1:numeric.Egrid
                   E = numeric.ERealAxis[w]
                   Ftnji = imagFreqFtn.GreenConstFull[jfull,ifull]
@@ -347,6 +353,6 @@ for cluster=start_cluster:num_of_subblock-1
        end
     end
 
-##=  mainloop end 
+##=  mainloop end
 end
 #############################################################################################

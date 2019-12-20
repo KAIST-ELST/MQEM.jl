@@ -9,7 +9,7 @@ end
 struct strImagFreqFtn
     GreenFtn
     GreenConstFull
-    GreenConst::Array{Complex128,2}
+    GreenConst::Array{ComplexF64,2}
     Normalization::Float64
     moments1
     moments2
@@ -20,23 +20,23 @@ end
 
 
 mutable struct strRealFreqFtn
- Spectral_default_model::Array{Array{Complex128,2}}
- logSpectral_default_model::Array{Array{Complex128,2}}
- Aw::Array{Array{Complex128,2}}
- Hw::Array{Array{Complex128,2}}
- H_extern::Array{Array{Complex128,2}}
+ Spectral_default_model::Array{Array{ComplexF64,2}}
+ logSpectral_default_model::Array{Array{ComplexF64,2}}
+ Aw::Array{Array{ComplexF64,2}}
+ Hw::Array{Array{ComplexF64,2}}
+ H_extern::Array{Array{ComplexF64,2}}
 end
 
 
 mutable struct strKernel
- Kernel::Array{Complex128,2}
- Kernel_dagger::Array{Complex128,2}
+ Kernel::Array{ComplexF64,2}
+ Kernel_dagger::Array{ComplexF64,2}
  moment::Array{Float64,2}
  moment_dagger::Array{Float64,2}
- smooth::Array{Complex128,2}
- cubic_coeff_transf::Array{Complex128,2}
- gamma::Array{Complex128,2}
- partial::Array{Complex128,2}
+ smooth::Array{ComplexF64,2}
+ cubic_coeff_transf::Array{ComplexF64,2}
+ gamma::Array{ComplexF64,2}
+ partial::Array{ComplexF64,2}
 end
 
 mutable struct strNumeric
