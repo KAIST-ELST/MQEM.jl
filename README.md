@@ -1,10 +1,10 @@
 # Maximum Quentum Entropy Method (MQEM)
 * Install Julia (https://julialang.org/downloads/)
-* MQEM module load path can be extended by defining the environment variable JULIA_LOAD_PATH.
+* Add MQEM package:
   ```ShellSession
-  $ export JULIA_LOAD_PATH=/path/to/MQEM/src:JULIA_LOAD_PATH
+  (v1.3) pkg>  dev path/to/MQEM.jl/
   ```
-* One can perform MQEM for analytic continuation continuation.
+* You can perform MQEM for analytic continuation continuation.
   ```ShellSession
-  $ julia  path/to/MQEM/src/mem.jl
+  $ julia  path/to/MQEM.jl/src/mem.jl
   ```

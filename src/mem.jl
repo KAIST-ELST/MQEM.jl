@@ -10,7 +10,8 @@
 
 using  MQEM
 using  MQEM.LsqFit  # add https://github.com/JuliaNLSolvers/LsqFit.jl
-import TOML   # add https://github.com/wildart/TOML.jl.git
+#import TOML   # add https://github.com/wildart/TOML.jl.git
+import Pkg.TOML   # add https://github.com/wildart/TOML.jl.git
 using  MQEM.DelimitedFiles
 using  MQEM.LinearAlgebra
 

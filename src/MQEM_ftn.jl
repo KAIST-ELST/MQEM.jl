@@ -11,7 +11,7 @@ using Printf
 using DelimitedFiles  #readdlm
 using Statistics  # var
 
-global blur_width = 0.5;
+global blur_width = 0.3;
 
 function get_total_energy_for_tail(imagFreqFtn ,Aw::Array{Array{ComplexF64,2}}, kernel, numeric)
         NumSubOrbit        = size(Aw[1])[1]
@@ -381,7 +381,7 @@ end
 	  if converg && integrated_chi2_alpha < integrated_chi2_alpha_prev  && trial == 0
 	          println("We have optimal alpha: $(auxiliary_inverse_temp) \n $(integrated_chi2_alpha_prev), $(integrated_chi2_alpha)")
         	  break
-          elseif  time()-search_start > 1200.0   && trial >=2
+          elseif  time()-search_start > 1200.0 
                println(time()-search_start)
                break
 	  end
