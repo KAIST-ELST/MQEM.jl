@@ -95,7 +95,7 @@ real_freq_grid_info= real_freq_grid_info_(EwinOuterRight,
 					   EgridInner
 					   )
 
-default_model  = input_ftn("default_model" ,"g_mat") # f, g, g_mat
+default_model  = input_ftn("default_model" ,"f") # f, g, g_mat
 Model_range_right = input_ftn("Model_right",EwinOuterRight)
 Model_range_left  = input_ftn("Model_left" ,EwinOuterLeft)
 auxiliary_inverse_temp_range = input_ftn("auxiliary_inverse_temp_range", [1e-2, 1.0] )
@@ -239,10 +239,10 @@ for cluster=start_cluster:num_of_subblock-1
     kernel = construct_Kernel_inCubicSpline(numeric, data_info)
     sigmaFlat = (EwinInnerRight - EwinInnerLeft)
 
-
-    sigma = min(( tr(imagFreqFtn.moments3)-tr(imagFreqFtn.moments2)^2),  ((EwinOuterRight - EwinOuterLeft)/4)^2)
-    if sigma>0
+    sigma = min(( tr(imagFreqFtn.moments3)-tr(imagFreqFtn.moments2^2)),  ((EwinOuterRight - EwinOuterLeft)/4)^2)
+    if sigma>0  &&  eigmin( imagFreqFtn.moments3 - imagFreqFtn.moments2^2) > 0
        sigma = sqrt(sigma)
+       println("<w^2> - <w>^2 =", sigma)
     else
       global default_model = "f"
     end
@@ -271,6 +271,9 @@ for cluster=start_cluster:num_of_subblock-1
            xinit[i]                     = Ainit[i,i]
            xinit[phyParm.NumSubOrbit+i] = Binit[i,i]
       end
+
+      println("Model gaussian Ainit: ", Ainit)
+      println("Model gaussian Binit: ", Binit)
 
       xinit = gaussianPotential!(imagFreqFtn, realFreqFtn, kernel, numeric, xinit, realFreqFtn.Spectral_default_model)
       moments_rep  = kernel.moment * realFreqFtn.Spectral_default_model
@@ -326,9 +329,10 @@ for cluster=start_cluster:num_of_subblock-1
 
     ##################################################################################
     #KK relation
-    Aw_RealPart = KK_relation( realFreqFtn.Aw, numeric)
-    write_results(phyParm.NumSubOrbit, fname_out, fname_contniuedSpectrum, fname_reproduce ,kernel, realFreqFtn.Aw, numeric.ERealAxis, imagFreqFtn.Normalization, imagFreqFtn.GreenConst, Aw_RealPart, numeric.Egrid,  data_info.inverse_temp)
+    Gw_RealPart = KK_relation( realFreqFtn.Aw, numeric)
+    write_results(phyParm.NumSubOrbit, fname_out, fname_contniuedSpectrum, fname_reproduce ,kernel, realFreqFtn.Aw, numeric.ERealAxis, imagFreqFtn.Normalization, imagFreqFtn.GreenConst, Gw_RealPart, numeric.Egrid,  data_info.inverse_temp, startOrbit, cluster)
 
+    ##################################################################################
     for Exchangecluster=cluster+1:num_of_subblock-1
       for i = 1:phyParm.NumSubOrbit
           for j=1:phyParm.NumSubOrbit
