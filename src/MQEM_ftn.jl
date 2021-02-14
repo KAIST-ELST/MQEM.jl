@@ -11,7 +11,7 @@ using Printf
 using DelimitedFiles  #readdlm
 using Statistics  # var
 
-global blur_width = 0.3;
+#global blur_width = 0.3;
 
 #function get_total_energy_for_tail(imagFreqFtn ,Aw::Array{Array{ComplexF64,2}}, kernel, numeric)
 #        NumSubOrbit        = size(Aw[1])[1]
@@ -789,8 +789,8 @@ function smoothKernel(numeric::strNumeric, data_info::data_info_, dSegment)
        Ej1=numeric.ERealAxis[j+1]
        Ej=numeric.ERealAxis[j]
 
-       upper_cut = minimum([En+blur_width, Ej1])
-       lower_cut = maximum([En-blur_width, Ej])
+       upper_cut = minimum([En+numeric.blur_width, Ej1])
+       lower_cut = maximum([En-numeric.blur_width, Ej])
        if upper_cut > lower_cut
          Kernel_from_cubic[n,s+1] =  f1(Ej, upper_cut) - f1(Ej,lower_cut)
          Kernel_from_cubic[n,s+2] =  f2(Ej, upper_cut) - f2(Ej,lower_cut)
@@ -798,7 +798,7 @@ function smoothKernel(numeric::strNumeric, data_info::data_info_, dSegment)
     end
    end
 #   Kernel_from_cubic /= (2*im*pi)
-   Kernel_from_cubic /= (2*blur_width)
+   Kernel_from_cubic /= (2*numeric.blur_width)
    SMOOTH=  (Kernel_from_cubic*  inv(B) * T)
 #   SMOOTH += SMOOTH'
 #   SMOOTH /= 2.0
@@ -997,13 +997,13 @@ end
        for n=1:N_Matsubara
          iwn = ((2. * n-1)*pi/data_info.inverse_temp)im;
 #         kernel.Kernel_dagger[l,n] = 1/(-iwn - numeric.ERealAxis[l] )
-         kernel.Kernel_dagger[l,n] = -  ( log((iwn + numeric.ERealAxis[l] + blur_width)/(iwn + numeric.ERealAxis[l] - blur_width)) )/ (2*blur_width)
+         kernel.Kernel_dagger[l,n] = -  ( log((iwn + numeric.ERealAxis[l] + numeric.blur_width)/(iwn + numeric.ERealAxis[l] - numeric.blur_width)) )/ (2*numeric.blur_width)
        end
      end
      for l=1:numeric.Egrid
       for mom=1:3
-	      kernel.moment_dagger[l  ,mom] =  1/mom * ( (numeric.ERealAxis[l]+blur_width)^mom -
-	                                                 (numeric.ERealAxis[l]-blur_width)^mom )/(2*blur_width)
+	      kernel.moment_dagger[l  ,mom] =  1/mom * ( (numeric.ERealAxis[l]+numeric.blur_width)^mom -
+	                                                 (numeric.ERealAxis[l]-numeric.blur_width)^mom )/(2*numeric.blur_width)
       end
      end
 

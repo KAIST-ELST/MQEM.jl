@@ -28,12 +28,14 @@ function input_ftn(var::String)
      exit()
   end
 end
-function input_ftn(var::String, val)
+function input_ftn(var::String, val, p::Bool=true)
   if haskey(input_toml, var)
-     println("$(var) = ",input_toml[var] )
+    println("$(var) = ",input_toml[var] )
     return input_toml[var]
   else
-     println("$(var) = ",val )
+     if p
+        println("$(var) = ",val )
+     end
     return val
   end
 end
@@ -50,7 +52,11 @@ function input_extern(var::String, extern_file::String)
 end
 ####################################################
 workDirect      =     input_ftn("workDirect", pwd())
-inputFile       =     input_ftn("inputFile", ARGS[1])
+inputFile       =     input_ftn("inputFile", "non")
+if inputFile=="non"
+inputFile = ARGS[1]
+end
+
 outputFileUseinputFile = input_ftn("outputFileUseinputFile",false)
 inverse_temp        = input_ftn("inverse_temp" ,-1.0            )
 if inverse_temp <0
@@ -118,6 +124,9 @@ pulay_mixing_start   = input_ftn("pulay_mixing_start",   1)
 pulay_mixing_step    = input_ftn("pulay_mixing_step",    1)
 pulay_mixing_history = input_ftn("pulay_mixing_history", 7)
 
+
+blur_width = input_ftn("blur", 0.3,false) 
+
 mixing_parm= mixing_parm_(NumIter,
 			   mixingInitial,
 			   mixing_max,
@@ -161,6 +170,7 @@ numeric = strNumeric(
  ,pulay_mixing_history
  ,pulay_mixing_step
  ,pulay_mixing_start
+ ,blur_width
 )
 
 

@@ -52,6 +52,7 @@ mutable struct strNumeric
  pulay_mixing_history::Int64
  pulay_mixing_step::Int64
  pulay_mixing_start::Int64
+ blur_width::Float64
 end
 
 
