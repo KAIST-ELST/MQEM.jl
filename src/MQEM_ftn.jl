@@ -918,19 +918,32 @@ end
      Gamma1 = 0.0
      Gamma2 = 0.0
      Gamma3 = 0.0
-     Gamma4 = 0.0
-     Gamma5 = 0.0
+
 
      Gamma1 =  (data_info.inverse_temp^2)*1/8
      Gamma2 =  (data_info.inverse_temp^4)*(15/(90*16))
      Gamma3 =  (data_info.inverse_temp^6)*(63/(945*64))
 
+     Gamma1_= 0.0
+     Gamma2_= 0.0
+     Gamma3_= 0.0
      for iw = 1:N_Matsubara
       z = ((2. * iw-1)*pi/data_info.inverse_temp);
-      Gamma1 -=      ((1/z  )^2)
-      Gamma2 -=      ((1/z^2)^2)
-      Gamma3 -=      ((1/z^3)^2)
+      Gamma1_ +=      ((1/z  )^2)
+      Gamma2_ +=      ((1/z^2)^2)
+      Gamma3_ +=      ((1/z^3)^2)
      end
+     Gamma1 -= Gamma1_
+     Gamma2 -= Gamma2_
+     Gamma3 -= Gamma3_
+
+
+#     for iw = 1:N_Matsubara
+#      z = ((2. * iw-1)*pi/data_info.inverse_temp);
+#      Gamma1  -=      ((1/z  )^2)
+#      Gamma2  -=      ((1/z^2)^2)
+#      Gamma3  -=      ((1/z^3)^2)
+#     end
 
 
 
@@ -944,8 +957,8 @@ end
      kernel.gamma[3,3] = Gamma3
 
 
-     kernel.gamma[1,3] = Gamma2
-     kernel.gamma[3,1] = Gamma2
+     kernel.gamma[1,3] = -Gamma2
+     kernel.gamma[3,1] = -Gamma2
 
 
       kernel.gamma = Hermitian(kernel.gamma)
